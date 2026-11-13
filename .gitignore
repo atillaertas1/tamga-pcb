@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+tools/*.jar
+.pcbmcp_backups/
+**/fab/
+*_routed.kicad_pcb
+*.png
+*.kicad_prl
+*-backups/
+fp-info-cache

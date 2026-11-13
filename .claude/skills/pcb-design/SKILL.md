@@ -1,0 +1,52 @@
+---
+name: pcb-design
+description: Use when designing, placing, routing, reviewing or exporting a KiCad PCB with the pcbmcp tools. Holds the design loop, JLCPCB fab limits and the placement/review checklist.
+---
+
+# PCB tasarım döngüsü (pcbmcp)
+
+## Kurallar
+- `.kicad_pcb` / `.kicad_sch` dosyalarını **asla** Read ile okuma; `board_summary`, `get_footprint` kullan.
+- Proje dosyaları (`.kicad_pro`) kuralları taşır; kartı kopyalarken tüm klasörü kopyala.
+- Yazan araçlar yedek alır (`.pcbmcp_backups/`). Yine de büyük adımlardan önce git commit öner.
+- Görsel (`render_board`) pahalı: sadece yerleşim bittiğinde ve son kontrolde bak.
+
+## Döngü
+1. `board_summary` → netleri ve parçaları anla. Eksik bilgi varsa kullanıcıya sor.
+2. Parça seçimi: `search_parts` ile **[B] basic** parçaları tercih et; seçtiğin LCSC kodunu
+   `set_footprint_fields(... field:'LCSC')` ile yaz.
+3. Yerleşim (`place_footprints`, tek batch'te):
+   - Konnektörler kenarda, kenara dik; mekanik kısıt varsa önce onlar.
+   - Decoupling kondansatörü ilgili IC güç pinine ≤ 2 mm, aynı katmanda.
+   - Regülatör: giriş C → VIN pini, çıkış C → VOUT pini; sıcak parçalar arasında boşluk.
+   - Kristal: MCU pinlerine ≤ 5 mm, altında başka sinyal yok.
+   - Footprint'ler arası courtyard çakışması yok; ~0.5 mm boşluk bırak.
+   - Her yerleşimden sonra `get_footprint` ile pad konumlarını doğrula, gerekirse düzelt.
+4. Netclass'lar (autoroute'tan ÖNCE, router bu genişlikleri kullanır):
+   - Güç netleri: `set_netclass(name='POWER', nets=[...], track_mm=akım×0.5, via_mm=0.8, via_drill_mm=0.4)`
+     (ör. 1 A → 0.5 mm). Akımı bilmiyorsan kullanıcıya sor, tahmin etme.
+   - `unmatched_nets` dönerse net adını `board_summary`'den düzelt.
+   - Rotadan sonra değiştirirsen `apply_to_existing=True` + `run_drc`.
+   - Kritik netler (USB diff pair, RF, yüksek hız) → kullanıcıya bırak veya açıkça işaretle.
+5. `autoroute` → `add_copper_zone GND B.Cu` (2 katmanda) → `run_drc`.
+6. DRC `CLEAN` olana kadar: en çok sayıdaki ihlal türünden başla, `examples` konumlarını kullan.
+7. `export_fab` → `missing_lcsc` boş olmalı; kalan varsa kullanıcıya listele.
+
+## JLCPCB standart 2/4 katman sınırları (2026)
+| Kural | Min | Önerilen |
+|---|---|---|
+| İz genişliği / boşluk | 0.127 mm (5 mil) | 0.2 mm |
+| Via çap / delik | 0.45 / 0.2 mm (4L: 0.25 delik) | 0.6 / 0.3 mm |
+| Bakır–kenar | 0.3 mm | 0.5 mm |
+| Silk çizgi / yazı yüksekliği | 0.15 / 1.0 mm | 0.15 / 1.0 mm |
+| Güç izi (1 oz, ΔT 10 °C) | ~0.3 mm/A dış katman | 0.5 mm/A |
+
+Fiyat/kapasite değişir; kritik projede JLC'nin güncel kapasite sayfasını kullanıcıya doğrulat.
+
+## Gözden geçirme checklist'i (export öncesi)
+- [ ] DRC CLEAN, unrouted = 0
+- [ ] Her IC'nin her güç pininde decoupling
+- [ ] Güç izleri akıma göre genişlikte; GND dökümü kesintisiz (izlerle bölünmemiş)
+- [ ] Montaj delikleri / konnektör konumları mekanik çizimle uyumlu
+- [ ] Polarite işaretleri (diyot, LED, elektrolitik, pin 1) silkte görünür
+- [ ] BOM'da tüm parçaların LCSC kodu var, basic olmayanlar kullanıcıya bildirildi

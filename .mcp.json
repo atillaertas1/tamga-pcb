@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pcbmcp": {
+      "command": "uv",
+      "args": ["run", "--directory", "/home/atilla/Documents/Personal/pcb-deneme", "pcbmcp"],
+      "env": {
+        "FREEROUTING_JAR": "/home/atilla/Documents/Personal/pcb-deneme/tools/freerouting.jar"
+      }
+    }
+  }
+}
