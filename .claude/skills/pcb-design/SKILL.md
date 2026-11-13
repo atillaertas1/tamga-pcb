@@ -11,6 +11,20 @@ description: Use when designing, placing, routing, reviewing or exporting a KiCa
 - Yazan araçlar yedek alır (`.pcbmcp_backups/`). Yine de büyük adımlardan önce git commit öner.
 - Görsel (`render_board`) pahalı: sadece yerleşim bittiğinde ve son kontrolde bak.
 
+## Sıfırdan tasarım (şematik + PCB)
+Tek doğruluk kaynağı `<name>.circuit.json`. `.kicad_sch` ondan üretilir; **elle düzenleme**
+bir sonraki `sync_design`'da ezilir, değişikliği spec'e yap.
+1. Gereksinimi netleştir (giriş gerilimi, akım, konnektör, kart boyutu). Bilinmeyeni sor.
+2. Her parça için: `find_symbol` → `get_symbol(lib_id, footprint)` ile pin adlarını ve
+   footprint pad numaralarının eşleştiğini doğrula → `find_footprint` (sembolün `fp_filters`'ı ile).
+   Pasiflerin değerini hesapla ve gerekçesini kullanıcıya yaz (ör. LED: R = (Vin−Vf)/I).
+3. `search_parts` ile LCSC kodu seç, spec'e `lcsc` olarak koy.
+4. `sync_design(project_dir, name, spec)` → `netlist_check: OK`, `erc: CLEAN`, `parity: OK` olmalı.
+   - `pin_not_connected` → ya bağla ya `nc` listesine ekle (bilinçli karar ver, hepsine `*` deme).
+   - `pwr_flags_added` normaldir.
+5. Sonraki değişiklikler `sync_design(..., patch={parts:[...], remove:[...]})` ile; PCB yerleşimi korunur.
+6. Sonra aşağıdaki döngü (yerleşimden itibaren).
+
 ## Döngü
 1. `board_summary` → netleri ve parçaları anla. Eksik bilgi varsa kullanıcıya sor.
 2. Parça seçimi: `search_parts` ile **[B] basic** parçaları tercih et; seçtiğin LCSC kodunu
@@ -28,7 +42,7 @@ description: Use when designing, placing, routing, reviewing or exporting a KiCa
    - `unmatched_nets` dönerse net adını `board_summary`'den düzelt.
    - Rotadan sonra değiştirirsen `apply_to_existing=True` + `run_drc`.
    - Kritik netler (USB diff pair, RF, yüksek hız) → kullanıcıya bırak veya açıkça işaretle.
-5. `autoroute` → `add_copper_zone GND B.Cu` (2 katmanda) → `run_drc`.
+5. `autoroute` → `add_copper_zone` (varsayılan: GND, iki katman + 5 mm stitching via) → `run_drc`.
 6. DRC `CLEAN` olana kadar: en çok sayıdaki ihlal türünden başla, `examples` konumlarını kullan.
 7. `export_fab` → `missing_lcsc` boş olmalı; kalan varsa kullanıcıya listele.
 

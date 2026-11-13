@@ -18,11 +18,13 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
+from . import design, library, report, route
 from . import parts as parts_mod
-from . import report, route
-from .kicad import abspath, cli, drc_json, erc_json, run_worker
+from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
 INSTRUCTIONS = """KiCad PCB tools. Units: mm, degrees, KiCad page coords (Y grows down).
+New design: find_symbol -> get_symbol(+footprint) -> search_parts -> sync_design(spec);
+edits later via sync_design(patch). Never hand-edit .kicad_sch; change the spec.
 Loop: board_summary -> place_footprints -> set_netclass (power nets wider) -> autoroute
 -> add_copper_zone GND -> run_drc until CLEAN -> set_footprint_fields LCSC -> export_fab.
 Never read .kicad_pcb files directly; use these tools. Write tools keep backups."""
@@ -45,6 +47,46 @@ def tool(fn):
     wrapper.__annotations__ = {**fn.__annotations__, "return": "str"}
     mcp.tool(structured_output=False)(wrapper)
     return fn
+
+
+# ------------------------------------------------------------------ tasarım (şematik + PCB)
+
+@tool
+def find_symbol(query: str, limit: int = 10) -> dict:
+    """Search KiCad symbol libraries. Returns 'Lib:Name | description | fp=default footprint'."""
+    return {"symbols": library.find_symbols(query, limit)}
+
+
+@tool
+def get_symbol(lib_id: str, footprint: str = "") -> dict:
+    """Pins of a symbol as 'number:name:type' (+unit). Call before using a symbol in a spec.
+    If footprint given, also lists its pad numbers so you can check they match."""
+    out = library.describe_symbol(lib_id)
+    if footprint:
+        out["footprint_pads"] = " ".join(library.footprint_pads(footprint))
+    return out
+
+
+@tool
+def find_footprint(query: str = "", pattern: str = "", limit: int = 15) -> dict:
+    """Search footprints. query: words that must all appear ('R 0805', 'soic 8').
+    pattern: symbol fp_filters wildcards ('R_* LED*'). Returns 'Lib:Name'."""
+    return {"footprints": library.find_footprints(query, pattern, limit)}
+
+
+@tool
+def sync_design(project_dir: str, name: str, spec: dict | None = None,
+                patch: dict | None = None) -> dict:
+    """Create/update schematic + PCB from a circuit spec (single source of truth,
+    saved as <name>.circuit.json). PCB placement/routing of existing parts is preserved.
+    spec: {title?, board:{width_mm,height_mm}, parts:[{ref, symbol:'Lib:Name',
+      footprint:'Lib:Name', value?, lcsc?, dnp?, pins:{pin_number_or_name: net}, nc?:[pins]|'*'}]}
+    patch (instead of spec, for edits): {parts:[partial parts merged by ref], remove:[refs]}.
+    Unlisted pins stay unconnected (ERC flags them) unless in nc. PWR_FLAGs are added
+    automatically. Checks: netlist vs spec, ERC, schematic<->PCB parity."""
+    if spec is None and patch is None:
+        raise KicadError("pass spec (new design) or patch (edit)")
+    return design.sync(project_dir, name, spec, patch)
 
 
 # ------------------------------------------------------------------ okuma
@@ -94,11 +136,13 @@ def set_footprint_fields(pcb_path: str, items: list[dict]) -> dict:
 
 
 @tool
-def add_copper_zone(pcb_path: str, net: str = "GND", layer: str = "B.Cu",
-                    clearance_mm: float = 0.3) -> dict:
-    """Add a copper pour covering the whole board outline on a layer, then fill."""
-    return run_worker("add_zone", {"pcb": abspath(pcb_path), "net": net,
-                                   "layer": layer, "clearance_mm": clearance_mm})
+def add_copper_zone(pcb_path: str, net: str = "GND", layer: str = "both",
+                    clearance_mm: float = 0.3, stitch_pitch_mm: float = 5.0) -> dict:
+    """Add a copper pour over the whole board (layer 'F.Cu'|'B.Cu'|'both') and fill.
+    With 'both', stitching vias every stitch_pitch_mm tie the layers (0 = none); this avoids
+    isolated-island / starved_thermal DRC errors. Run after autoroute."""
+    return run_worker("add_zone", {"pcb": abspath(pcb_path), "net": net, "layer": layer,
+                                   "clearance_mm": clearance_mm, "stitch_pitch_mm": stitch_pitch_mm})
 
 
 @tool

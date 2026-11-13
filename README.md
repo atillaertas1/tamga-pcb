@@ -23,14 +23,16 @@ Neden böyle:
 ## Token verimliliği
 | Önlem | Etki |
 |---|---|
-| 14 araç, kısa açıklamalar | araç şemaları ≈ 1.6k token (hazır sunucularda 64-216 araç) |
+| 18 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
 | Ham `.kicad_pcb` yok; footprint başına 1 satır | 7 parçalı kart özeti ≈ 900 karakter |
 | DRC/ERC türe göre gruplu, 3 örnek konum | 300 ihlal → ~1 KB |
 | Parça başına 1 satır, basic önce | 20 sonuç yerine 8 satır |
 | Kurallar/checklist skill'de | sadece PCB işinde bağlama yüklenir |
 
 ## Araçlar
-`board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
+**Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `sync_design`
+
+**Kart:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
 `fill_zones`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
 `import_board` (Altium `.PcbDoc`, Eagle, PADS, CADSTAR...).
 
@@ -41,7 +43,7 @@ uv sync
 # Freerouting (bir kez): https://github.com/freerouting/freerouting/releases
 curl -L -o tools/freerouting.jar \
   https://github.com/freerouting/freerouting/releases/download/v2.5.0/freerouting-2.5.0.jar
-uv run pytest -q          # 16 test, KiCad 10 gerekir (autoroute testi jar varsa koşar)
+uv run pytest -q          # 24 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
 ```
 Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
 Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.
@@ -52,14 +54,39 @@ Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory 
 ```
 Test kartı: `/usr/bin/python3 scripts/make_example_board.py examples/ldo/ldo.kicad_pcb`
 
-## Şematik tarafı
-Şematiği koddan üretmek için iki yol:
-1. **atopile** (`uv tool install atopile`, `ato build`) → KiCad projesi üretir, ardından bu araçlar.
-2. KiCad eeschema'da elle çiz → `run_erc` ile kontrol → "Update PCB from schematic" → bu araçlar.
+## Sıfırdan tasarım: devre tanımı → şematik + PCB
+Tek doğruluk kaynağı `<name>.circuit.json`:
+```json
+{"title": "LED", "board": {"width_mm": 20, "height_mm": 15},
+ "parts": [
+  {"ref": "J1", "symbol": "Connector_Generic:Conn_01x02", "value": "5V IN",
+   "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+   "pins": {"1": "+5V", "2": "GND"}},
+  {"ref": "R1", "symbol": "Device:R", "value": "330", "lcsc": "C17630",
+   "footprint": "Resistor_SMD:R_0805_2012Metric", "pins": {"1": "+5V", "2": "LED_A"}},
+  {"ref": "D1", "symbol": "Device:LED", "value": "GREEN",
+   "footprint": "LED_SMD:LED_0805_2012Metric", "pins": {"A": "LED_A", "K": "GND"}}]}
+```
+`sync_design` bundan şunları yapar:
+1. `.kicad_sch` üretir: pin uçlarına tel + global label, deterministik UUID'ler,
+   çok birimli semboller (LM358 vb.), `extends` ile türetilmiş semboller düzleştirilir,
+   gerekli `PWR_FLAG`'ler otomatik.
+2. `kicad-cli` ile netlist çıkarır ve spec ile karşılaştırır (`netlist_check`).
+3. PCB'yi netlist'ten günceller (KiCad'in F8'i gibi): ekle / footprint değiştir / sil,
+   **mevcut yerleşimi korur**, footprint'leri sembollere bağlar.
+4. ERC + şematik↔PCB parity kontrolü.
+
+Pin anahtarı numara (`"1"`) veya ad (`"A"`, `"VI"`) olabilir. Yanlış pin adında hiçbir dosya
+yazılmaz, mevcut pinler listelenir. Düzenleme için `patch={parts:[{ref:"R1", value:"470"}], remove:["C1"]}`.
+
+Sınırlar: tek sayfa (hiyerarşik sheet yok); şematik okunur ama "label stili" (tel çizimi yok);
+`.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.
 
 ## Yol haritası
 - [ ] kipy (IPC) backend: açık KiCad'de canlı düzenleme
 - [x] Netclass yönetimi (güç netleri için geniş iz) — `set_netclass`
+- [x] Şematik üretimi (spec → .kicad_sch + PCB senkronu)
+- [ ] Hiyerarşik sheet'ler, güç sembolleri
 - [ ] Kritik net için `route_net(net, waypoints)` (elle yön verilen rota)
 - [ ] DeepPCB/Quilter API alternatif router
 - [ ] ngspice ile analog blok simülasyonu

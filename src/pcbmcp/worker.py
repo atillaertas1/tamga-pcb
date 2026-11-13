@@ -76,7 +76,7 @@ def cmd_summary(a: dict) -> dict:
     for fp in fps:
         for pad in fp.Pads():
             n = pad.GetNetname()
-            if n:
+            if n and not n.startswith("unconnected-"):
                 pads_per_net[n] = pads_per_net.get(n, 0) + 1
 
     max_fp = int(a.get("max_footprints", 40))
@@ -162,30 +162,83 @@ def cmd_fill_zones(a: dict) -> dict:
     return {"filled": len(zones), "backup": bk}
 
 
+def _stitch(b, net, pitch_mm: float, via_mm: float = 0.6, drill_mm: float = 0.3) -> int:
+    """İki katmanda da aynı net dökümünün dolu olduğu ızgara noktalarına via koy.
+
+    Via dairesi her iki katmandaki dolu poligonun tamamen içindeyse eklenir; dolgu zaten
+    diğer bakırlardan clearance kadar uzak olduğu için çakışma olmaz.
+    """
+    zones = [z for z in b.Zones() if z.GetNetCode() == net.GetNetCode()]
+    by_layer = {}
+    for z in zones:
+        for lyr in (pcbnew.F_Cu, pcbnew.B_Cu):
+            if z.IsOnLayer(lyr):
+                by_layer.setdefault(lyr, []).append(z.GetFilledPolysList(lyr))
+    if pcbnew.F_Cu not in by_layer or pcbnew.B_Cu not in by_layer:
+        return 0
+    r = pcbnew.FromMM(via_mm / 2 + 0.05)
+    ring = [(int(r * dx), int(r * dy)) for dx, dy in
+            [(1, 0), (-1, 0), (0, 1), (0, -1), (.7, .7), (-.7, .7), (.7, -.7), (-.7, -.7), (0, 0)]]
+
+    def inside(polys, x, y):
+        return all(any(p.Contains(pcbnew.VECTOR2I(x + dx, y + dy)) for p in polys) for dx, dy in ring)
+
+    bb = b.GetBoardEdgesBoundingBox()
+    step, inset = pcbnew.FromMM(pitch_mm), pcbnew.FromMM(1.5)
+    n = 0
+    y = bb.GetTop() + inset
+    while y <= bb.GetBottom() - inset:
+        x = bb.GetLeft() + inset
+        while x <= bb.GetRight() - inset:
+            if inside(by_layer[pcbnew.F_Cu], x, y) and inside(by_layer[pcbnew.B_Cu], x, y):
+                v = pcbnew.PCB_VIA(b)
+                v.SetViaType(pcbnew.VIATYPE_THROUGH)
+                v.SetPosition(pcbnew.VECTOR2I(x, y))
+                v.SetWidth(pcbnew.FromMM(via_mm))
+                v.SetDrill(pcbnew.FromMM(drill_mm))
+                v.SetNet(net)
+                v.SetIsFree(True)
+                b.Add(v)
+                n += 1
+            x += step
+        y += step
+    return n
+
+
 def cmd_add_zone(a: dict) -> dict:
-    """Kart sınırını kaplayan bir bakır dökümü (ör. GND) ekle."""
+    """Kart sınırını kaplayan bakır dökümü (ör. GND). layer='both' -> F.Cu + B.Cu.
+    stitch_pitch_mm > 0 ise iki katmanı stitching via'larla bağla."""
     path = a["pcb"]
     b = load(path)
     net = b.FindNet(a["net"])
     if net is None:
         raise KeyError(f"net {a['net']} not found")
-    layer = b.GetLayerID(a.get("layer", "B.Cu"))
+    layer_arg = a.get("layer", "B.Cu")
+    layers = ["F.Cu", "B.Cu"] if layer_arg == "both" else [layer_arg]
     bb = b.GetBoardEdgesBoundingBox()
-    z = pcbnew.ZONE(b)
-    z.SetLayer(layer)
-    z.SetNet(net)
-    z.SetLocalClearance(pcbnew.FromMM(float(a.get("clearance_mm", 0.3))))
-    z.SetMinThickness(pcbnew.FromMM(0.25))
-    ol = z.Outline()
-    ol.NewOutline()
-    for x, y in [(bb.GetLeft(), bb.GetTop()), (bb.GetRight(), bb.GetTop()),
-                 (bb.GetRight(), bb.GetBottom()), (bb.GetLeft(), bb.GetBottom())]:
-        ol.Append(x, y)
-    b.Add(z)
-    pcbnew.ZONE_FILLER(b).Fill(list(b.Zones()))
-    bk = backup(path)
+    for lname in layers:
+        z = pcbnew.ZONE(b)
+        z.SetLayer(b.GetLayerID(lname))
+        z.SetNet(net)
+        z.SetLocalClearance(pcbnew.FromMM(float(a.get("clearance_mm", 0.3))))
+        z.SetMinThickness(pcbnew.FromMM(0.25))
+        ol = z.Outline()
+        ol.NewOutline()
+        for x, y in [(bb.GetLeft(), bb.GetTop()), (bb.GetRight(), bb.GetTop()),
+                     (bb.GetRight(), bb.GetBottom()), (bb.GetLeft(), bb.GetBottom())]:
+            ol.Append(x, y)
+        b.Add(z)
+    filler = pcbnew.ZONE_FILLER(b)
+    filler.Fill(list(b.Zones()))
+    out = {"zone": f"{a['net']} on {'+'.join(layers)}"}
+    pitch = float(a.get("stitch_pitch_mm") or 0)
+    if pitch > 0:
+        out["stitch_vias"] = _stitch(b, net, pitch)
+        filler.Fill(list(b.Zones()))  # via'lar dolguya bağlansın
+    out["backup"] = backup(path)
     pcbnew.SaveBoard(path, b)
-    return {"zone": f"{a['net']} on {a.get('layer', 'B.Cu')}", "backup": bk, "unrouted": unrouted(b)}
+    out["unrouted"] = unrouted(b)
+    return out
 
 
 def cmd_export_dsn(a: dict) -> dict:
@@ -273,7 +326,7 @@ def netclass_map(b) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for name in b.GetNetsByName().keys():
         name = str(name)
-        if not name:
+        if not name or name.startswith("unconnected-"):
             continue
         cls = ns.GetEffectiveNetClass(name).GetName()
         out.setdefault(str(cls), []).append(name)
@@ -344,7 +397,154 @@ def cmd_set_netclass(a: dict) -> dict:
     return out
 
 
+FP_DIR = os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints")
+
+
+def _new_board(path: str, w: float, h: float):
+    """Boş kart: Edge.Cuts dikdörtgeni (100,100)'den başlar + JLCPCB standart kuralları."""
+    b = pcbnew.NewBoard(path)
+    x0, y0 = 100.0, 100.0
+    corners = [(x0, y0), (x0 + w, y0), (x0 + w, y0 + h), (x0, y0 + h)]
+    for (ax, ay), (bx, by) in zip(corners, corners[1:] + corners[:1]):
+        s = pcbnew.PCB_SHAPE(b)
+        s.SetShape(pcbnew.SHAPE_T_SEGMENT)
+        s.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(ax), pcbnew.FromMM(ay)))
+        s.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(bx), pcbnew.FromMM(by)))
+        s.SetLayer(pcbnew.Edge_Cuts)
+        s.SetWidth(pcbnew.FromMM(0.1))
+        b.Add(s)
+    ds = b.GetDesignSettings()
+    ds.m_TrackMinWidth = pcbnew.FromMM(0.127)
+    ds.m_MinClearance = pcbnew.FromMM(0.127)
+    ds.m_ViasMinSize = pcbnew.FromMM(0.45)
+    ds.m_MinThroughDrill = pcbnew.FromMM(0.2)
+    ds.m_CopperEdgeClearance = pcbnew.FromMM(0.3)
+    return b
+
+
+def _load_fp(fid: str):
+    lib, name = fid.split(":", 1)
+    fp = pcbnew.FootprintLoad(f"{FP_DIR}/{lib}.pretty", name)
+    if fp is None:
+        raise KeyError(f"footprint {fid} not found")
+    fp.SetFPID(pcbnew.LIB_ID(lib, name))
+    return fp
+
+
+def _set_field(fp, name: str, val: str) -> None:
+    f = fp.GetField(name)
+    if f is None:
+        f = pcbnew.PCB_FIELD(fp, fp.GetNextFieldOrdinal(), name)
+        f.SetVisible(False)
+        f.SetLayer(pcbnew.F_Fab)
+        fp.Add(f)
+    f.SetText(val)
+
+
+def cmd_sync_pcb(a: dict) -> dict:
+    """Şematikten PCB'ye güncelle (KiCad'in F8'i gibi): ekle / değiştir / sil, yerleşimi koru.
+
+    parts: [{ref, value, footprint, lcsc, sym_uuid, dnp, pads: {pad_no: net}}]
+    """
+    path = a["pcb"]
+    created = not os.path.isfile(path)
+    if created:
+        b = _new_board(path, float(a["board"].get("width_mm", 50)), float(a["board"].get("height_mm", 40)))
+    else:
+        b = load(path)
+
+    nets = {}
+    for p in a["parts"]:
+        for net in p["pads"].values():
+            if net not in nets:
+                n = b.FindNet(net)
+                if n is None:
+                    n = pcbnew.NETINFO_ITEM(b, net)
+                    b.Add(n)
+                nets[net] = n
+
+    want = {p["ref"]: p for p in a["parts"] if p.get("footprint")}
+    added, replaced, removed, updated, warnings = [], [], [], [], []
+    existing = {fp.GetReference(): fp for fp in b.GetFootprints()}
+
+    for ref, fp in existing.items():
+        if ref not in want:
+            b.Remove(fp)
+            removed.append(ref)
+
+    bb = b.GetBoardEdgesBoundingBox()
+    cur_x, cur_y, row_h = bb.GetLeft() + pcbnew.FromMM(2), bb.GetTop() + pcbnew.FromMM(2), 0
+    kept = [fp for r, fp in existing.items() if r in want]
+    if kept:  # yeni parçaları mevcut yerleşimin altından başlat, üstüne koyma
+        cur_y = max(fp.GetBoundingBox(False).GetBottom() for fp in kept) + pcbnew.FromMM(1.5)
+    for ref, p in want.items():
+        old = existing.get(ref)
+        if old is not None and str(old.GetFPID().GetUniStringLibId()) == p["footprint"]:
+            fp = old
+            updated.append(ref)
+        else:
+            try:
+                fp = _load_fp(p["footprint"])
+            except KeyError as e:
+                warnings.append(f"{ref}: {e}")
+                continue
+            fp.SetReference(ref)
+            if old is not None:  # footprint değişti: konumu ve yüzü koru
+                fp.SetPosition(old.GetPosition())
+                fp.SetOrientation(old.GetOrientation())
+                if old.IsFlipped():
+                    fp.Flip(fp.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
+                b.Remove(old)
+                replaced.append(ref)
+            else:  # yeni: kart içinde ızgaraya diz
+                fbb = fp.GetBoundingBox(False)
+                w, h = fbb.GetWidth(), fbb.GetHeight()
+                if cur_x + w > bb.GetRight() - pcbnew.FromMM(1):
+                    cur_x, cur_y, row_h = bb.GetLeft() + pcbnew.FromMM(2), cur_y + row_h + pcbnew.FromMM(1.5), 0
+                off = fp.GetPosition() - fbb.GetOrigin()
+                fp.SetPosition(pcbnew.VECTOR2I(int(cur_x + off.x), int(cur_y + off.y)))
+                cur_x += w + pcbnew.FromMM(1.5)
+                row_h = max(row_h, h)
+                added.append(ref)
+            b.Add(fp)
+        fp.SetValue(p.get("value") or fp.GetValue())
+        fp.SetPath(pcbnew.KIID_PATH(f"/{p['sym_uuid']}"))
+        fp.SetSheetname("/")
+        fp.SetSheetfile(a["sheetfile"])
+        fp.SetDNP(bool(p.get("dnp")))
+        if p.get("lcsc"):
+            _set_field(fp, "LCSC", p["lcsc"])
+
+        pad_nums = set()
+        for pad in fp.Pads():
+            num = pad.GetNumber()
+            pad_nums.add(num)
+            net = p["pads"].get(num)
+            if net:
+                pad.SetNet(nets[net])
+            else:
+                pad.SetNetCode(0)
+        missing = sorted(set(p["pads"]) - pad_nums)
+        if missing:
+            warnings.append(f"{ref}: symbol pins {missing} have no pad in {p['footprint']}")
+
+    bk = None if created else backup(path)
+    pcbnew.SaveBoard(path, b)
+    out = {"pcb": path, "created": created, "added": added, "updated": len(updated),
+           "replaced": replaced, "removed": removed, "unrouted": unrouted(b)}
+    if bk:
+        out["backup"] = bk
+    if warnings:
+        out["warnings"] = warnings
+    outside = [f.GetReference() for f in b.GetFootprints()
+               if not b.GetBoardEdgesBoundingBox().Contains(f.GetPosition())]
+    if outside:
+        out["outside_board"] = outside
+    return out
+
+
 COMMANDS = {
+    "sync_pcb": cmd_sync_pcb,
     "set_netclass": cmd_set_netclass,
     "fab_tables": cmd_fab_tables,
     "set_field": cmd_set_field,

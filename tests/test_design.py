@@ -1,0 +1,133 @@
+"""Spec -> şematik + PCB testleri (gerçek KiCad kütüphaneleri ve kicad-cli ile)."""
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+from mcp.server.mcpserver.exceptions import ToolError
+
+from pcbmcp import design, library, sexpr, server
+from pcbmcp.kicad import KICAD_PYTHON
+
+ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.skipif(
+    shutil.which("kicad-cli") is None or not library.SYM_DIR.is_dir()
+    or subprocess.run([KICAD_PYTHON, "-c", "import pcbnew"], capture_output=True).returncode != 0,
+    reason="KiCad not installed",
+)
+
+LED_SPEC = {
+    "title": "LED", "board": {"width_mm": 20, "height_mm": 15},
+    "parts": [
+        {"ref": "J1", "symbol": "Connector_Generic:Conn_01x02", "value": "5V IN",
+         "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+         "pins": {"1": "+5V", "2": "GND"}},
+        {"ref": "R1", "symbol": "Device:R", "value": "330", "lcsc": "C17630",
+         "footprint": "Resistor_SMD:R_0805_2012Metric", "pins": {"1": "+5V", "2": "LED_A"}},
+        {"ref": "D1", "symbol": "Device:LED", "value": "GREEN",
+         "footprint": "LED_SMD:LED_0805_2012Metric", "pins": {"A": "LED_A", "K": "GND"}},
+    ],
+}
+
+
+def test_sexpr_roundtrip():
+    text = '(a (b "x \\"q\\"" 1 2.5) (c yes) (d))'
+    t = sexpr.parse(text)
+    assert sexpr.parse(sexpr.dump(t)) == t
+    assert t[1][1] == 'x "q"' and isinstance(t[2][1], sexpr.Sym)
+
+
+def test_symbol_lookup_and_extends_flattening():
+    led = library.describe_symbol("Device:LED")
+    assert led["pins"] == ["1:K:passive", "2:A:passive"]
+    ams = library.describe_symbol("Regulator_Linear:AMS1117-3.3")  # AP1117-15'ten türetilmiş
+    assert ams["pins"] == ["1:GND:power_in", "2:VO:power_out", "3:VI:power_in"]
+    assert library.describe_symbol("Amplifier_Operational:LM358")["units"] == 3
+    assert library.find_symbols("ams1117 3.3", 1)[0].startswith("Regulator_Linear:AMS1117-3.3 ")
+    assert "Resistor_SMD:R_0805_2012Metric" in library.find_footprints("R 0805")
+    assert library.footprint_pads("Package_TO_SOT_SMD:SOT-223-3_TabPin2") == ["1", "2", "3"]
+
+
+def test_led_from_scratch(tmp_path):
+    r = design.sync(str(tmp_path), "led", LED_SPEC, None)
+    assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
+    assert r["nets"] == "+5V:2 GND:2 LED_A:2"
+    assert r["pcb"]["created"] and r["pcb"]["added"] == ["J1", "R1", "D1"]
+    assert "outside_board" not in r["pcb"]
+    s = server.board_summary(r["files"]["pcb"])
+    assert s["nets"] == "+5V:2 GND:2 LED_A:2" and s["size_mm"] == [20.1, 15.1]
+    assert json.loads(Path(r["files"]["spec"]).read_text())["parts"][1]["lcsc"] == "C17630"
+
+
+def test_patch_preserves_placement(tmp_path):
+    d = str(tmp_path)
+    r = design.sync(d, "led", LED_SPEC, None)
+    pcb = r["files"]["pcb"]
+    server.place_footprints(pcb, [{"ref": "R1", "x": 110, "y": 107, "rot": 90}])
+    r = design.sync(d, "led", None, {
+        "parts": [{"ref": "C1", "symbol": "Device:C", "value": "100n",
+                   "footprint": "Capacitor_SMD:C_0603_1608Metric", "pins": {"1": "+5V", "2": "GND"}},
+                  {"ref": "R1", "value": "470"}]})
+    assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
+    assert r["pcb"]["added"] == ["C1"]
+    line = server.get_footprint(pcb, "R1")["line"]
+    assert line.startswith("R1 470 R_0805_2012Metric @(110.0,107.0) r90")
+
+    r = design.sync(d, "led", None, {"parts": [{"ref": "R1", "footprint": "Resistor_SMD:R_0603_1608Metric"}],
+                                     "remove": ["C1"]})
+    assert r["pcb"]["replaced"] == ["R1"] and r["pcb"]["removed"] == ["C1"] and r["parity"] == "OK"
+    assert "@(110.0,107.0) r90" in server.get_footprint(pcb, "R1")["line"]
+
+
+def test_bad_pin_writes_nothing(tmp_path):
+    d = str(tmp_path)
+    design.sync(d, "led", LED_SPEC, None)
+    before = (tmp_path / "led.kicad_sch").read_text()
+    with pytest.raises(ToolError, match="no pin 'ANODE'.*2:A"):
+        design.sync(d, "led", None, {"parts": [{"ref": "D1", "pins": {"ANODE": "X"}}]})
+    assert (tmp_path / "led.kicad_sch").read_text() == before
+
+
+def test_multi_unit_power_flags_and_nc(tmp_path):
+    spec = {"board": {"width_mm": 30, "height_mm": 20}, "parts": [
+        {"ref": "J1", "symbol": "Connector_Generic:Conn_01x03",
+         "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+         "pins": {"1": "+5V", "2": "GND", "3": "SIG"}},
+        {"ref": "U1", "symbol": "Amplifier_Operational:LM358",
+         "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+         "pins": {"V+": "+5V", "V-": "GND", "3": "SIG", "1": "OUT", "2": "OUT"}, "nc": ["5", "6", "7"]},
+        {"ref": "J2", "symbol": "Connector_Generic:Conn_01x01",
+         "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical", "pins": {"1": "OUT"}},
+    ]}
+    r = design.sync(str(tmp_path), "amp", spec, None)
+    assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
+    assert r["pwr_flags_added"] == ["+5V", "GND"]
+
+
+def test_unconnected_pin_is_reported_by_erc(tmp_path):
+    spec = json.loads(json.dumps(LED_SPEC))
+    spec["parts"][2]["pins"] = {"A": "LED_A"}  # katot bağlı değil
+    r = design.sync(str(tmp_path), "led", spec, None)
+    assert r["erc"] != "CLEAN"
+    assert any(t["type"] == "pin_not_connected" for t in r["erc"]["types"])
+
+
+@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file(), reason="no freerouting.jar")
+def test_full_flow_to_fab(tmp_path, monkeypatch):
+    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    r = design.sync(str(tmp_path), "led", LED_SPEC, None)
+    pcb = r["files"]["pcb"]
+    server.place_footprints(pcb, [
+        {"ref": "J1", "x": 103, "y": 106, "rot": 0},
+        {"ref": "R1", "x": 109, "y": 104.5, "rot": 0},
+        {"ref": "D1", "x": 115, "y": 104.5, "rot": 180},
+    ])
+    server.set_netclass(pcb, "POWER", ["+5V"], track_mm=0.4)
+    routed = server.autoroute(pcb, out_path=pcb, max_passes=50)
+    assert routed["unrouted_after"] == 0
+    z = server.add_copper_zone(pcb)  # GND, iki katman + stitching via
+    assert z["stitch_vias"] > 0
+    assert server.run_drc(pcb, schematic_parity=True).get("verdict") == "CLEAN"
+    fab = server.export_fab(pcb)
+    assert fab["missing_lcsc"] and "R1" not in fab["missing_lcsc"]

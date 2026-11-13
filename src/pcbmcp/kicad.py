@@ -40,8 +40,23 @@ def run_worker(cmd: str, args: dict, timeout: int = 300) -> dict:
     raise KicadError(f"worker '{cmd}' crashed (exit {proc.returncode}): {tail}")
 
 
-def cli(*args: str, timeout: int = 300, ok_codes: tuple[int, ...] = (0,)) -> subprocess.CompletedProcess:
-    proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, timeout=timeout)
+def _clear_stale_locks(args: tuple[str, ...]) -> None:
+    """Çöken kicad-cli '~x.kicad_pro.lck' bırakabiliyor; aynı klasördeki kilitleri sil."""
+    for a in args:
+        p = Path(a)
+        if p.suffix in (".kicad_pcb", ".kicad_sch") and p.parent.is_dir():
+            for lck in p.parent.glob("~*.lck"):
+                lck.unlink(missing_ok=True)
+
+
+def cli(*args: str, timeout: int = 300, ok_codes: tuple[int, ...] = (0,),
+        retries: int = 2) -> subprocess.CompletedProcess:
+    for attempt in range(retries + 1):
+        proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, timeout=timeout)
+        # Negatif kod = sinyal (KiCad 10.0.7'de aralıklı 'double free' çökmesi görüldü): tekrar dene
+        if proc.returncode >= 0 or attempt == retries:
+            break
+        _clear_stale_locks(args)
     if proc.returncode not in ok_codes:
         # wx debug satırlarını at, gerçek hatayı göster
         err = "\n".join(l for l in (proc.stderr + proc.stdout).splitlines() if "Debug:" not in l)
