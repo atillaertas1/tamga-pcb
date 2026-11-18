@@ -137,12 +137,20 @@ def set_footprint_fields(pcb_path: str, items: list[dict]) -> dict:
 
 @tool
 def add_copper_zone(pcb_path: str, net: str = "GND", layer: str = "both",
-                    clearance_mm: float = 0.3, stitch_pitch_mm: float = 5.0) -> dict:
+                    clearance_mm: float = 0.3, stitch_pitch_mm: float = 5.0,
+                    polygon_mm: list[list[float]] | None = None, priority: int = 0,
+                    keepout_tracks: bool = False) -> dict:
     """Add a copper pour over the whole board (layer 'F.Cu'|'B.Cu'|'both') and fill.
     With 'both', stitching vias every stitch_pitch_mm tie the layers (0 = none); this avoids
-    isolated-island / starved_thermal DRC errors. Run after autoroute."""
+    isolated-island / starved_thermal DRC errors. Run after autoroute.
+    polygon_mm [[x,y],...] limits the pour to a region (e.g. a high-current rail into
+    fine-pitch pads); give it priority > 0 so a later full-board GND pour flows around it.
+    keepout_tracks=True instead adds a no-tracks rule area over polygon_mm (before autoroute,
+    so other nets don't cut that pour)."""
     return run_worker("add_zone", {"pcb": abspath(pcb_path), "net": net, "layer": layer,
-                                   "clearance_mm": clearance_mm, "stitch_pitch_mm": stitch_pitch_mm})
+                                   "clearance_mm": clearance_mm, "stitch_pitch_mm": stitch_pitch_mm,
+                                   "polygon_mm": polygon_mm, "priority": priority,
+                                   "keepout_tracks": keepout_tracks})
 
 
 @tool

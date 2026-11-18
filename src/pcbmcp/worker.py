@@ -180,7 +180,17 @@ def _stitch(b, net, pitch_mm: float, via_mm: float = 0.6, drill_mm: float = 0.3)
     ring = [(int(r * dx), int(r * dy)) for dx, dy in
             [(1, 0), (-1, 0), (0, 1), (0, -1), (.7, .7), (-.7, .7), (.7, -.7), (-.7, -.7), (0, 0)]]
 
+    # Aynı netin pad'leri de dolgunun "içinde" sayılır (ör. GND montaj deliği); via'yı
+    # deliğin/pad'in üstüne koymamak için tüm pad'lerin kutusunu via yarıçapı kadar büyüt.
+    keep = []
+    for p in b.GetPads():
+        bb = p.GetBoundingBox()
+        bb.Inflate(r)
+        keep.append(bb)
+
     def inside(polys, x, y):
+        if any(bb.Contains(pcbnew.VECTOR2I(x, y)) for bb in keep):
+            return False
         return all(any(p.Contains(pcbnew.VECTOR2I(x + dx, y + dy)) for p in polys) for dx, dy in ring)
 
     bb = b.GetBoardEdgesBoundingBox()
@@ -211,21 +221,50 @@ def cmd_add_zone(a: dict) -> dict:
     path = a["pcb"]
     b = load(path)
     net = b.FindNet(a["net"])
-    if net is None:
+    if net is None and not a.get("keepout_tracks"):  # keepout'un neti yok; ad için kullanılır
         raise KeyError(f"net {a['net']} not found")
     layer_arg = a.get("layer", "B.Cu")
     layers = ["F.Cu", "B.Cu"] if layer_arg == "both" else [layer_arg]
     bb = b.GetBoardEdgesBoundingBox()
+    # polygon_mm verilirse bölgesel döküm (ör. ince adımlı konnektöre giden yüksek akımlı
+    # güç hattı: iz genişliği pad'e sığmaz, döküm pad'i doğrudan kaplar). Yoksa tüm kart.
+    poly = a.get("polygon_mm")
+    pts = ([(pcbnew.FromMM(x), pcbnew.FromMM(y)) for x, y in poly] if poly else
+           [(bb.GetLeft(), bb.GetTop()), (bb.GetRight(), bb.GetTop()),
+            (bb.GetRight(), bb.GetBottom()), (bb.GetLeft(), bb.GetBottom())])
+    if a.get("keepout_tracks"):
+        # Kural alanı: bu bölgeden (bu katmanda) iz geçmesin; router başka katmana geçer.
+        # Bölgesel güç dökümünün izlerle ikiye bölünmesini önlemek için autoroute'tan önce.
+        for lname in layers:
+            z = pcbnew.ZONE(b)
+            z.SetIsRuleArea(True)
+            z.SetDoNotAllowTracks(True)
+            for setter in ("SetDoNotAllowVias", "SetDoNotAllowPads", "SetDoNotAllowFootprints",
+                           "SetDoNotAllowZoneFills", "SetDoNotAllowCopperPour"):
+                if hasattr(z, setter):
+                    getattr(z, setter)(False)
+            z.SetLayer(b.GetLayerID(lname))
+            z.SetZoneName(f"keepout_{a['net']}")
+            ol = z.Outline()
+            ol.NewOutline()
+            for x, y in pts:
+                ol.Append(x, y)
+            b.Add(z)
+        out = {"keepout": f"tracks on {'+'.join(layers)}", "backup": backup(path)}
+        pcbnew.SaveBoard(path, b)
+        return out
     for lname in layers:
         z = pcbnew.ZONE(b)
         z.SetLayer(b.GetLayerID(lname))
         z.SetNet(net)
         z.SetLocalClearance(pcbnew.FromMM(float(a.get("clearance_mm", 0.3))))
         z.SetMinThickness(pcbnew.FromMM(0.25))
+        z.SetAssignedPriority(int(a.get("priority", 0)))
+        if poly:  # küçük pad'lerde thermal spoke'lar sığmaz -> tam bağlantı
+            z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
         ol = z.Outline()
         ol.NewOutline()
-        for x, y in [(bb.GetLeft(), bb.GetTop()), (bb.GetRight(), bb.GetTop()),
-                     (bb.GetRight(), bb.GetBottom()), (bb.GetLeft(), bb.GetBottom())]:
+        for x, y in pts:
             ol.Append(x, y)
         b.Add(z)
     filler = pcbnew.ZONE_FILLER(b)
