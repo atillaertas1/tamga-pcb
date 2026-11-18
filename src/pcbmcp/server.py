@@ -18,7 +18,7 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
-from . import design, library, pinout, report, route
+from . import design, importer, library, pinout, report, route
 from . import parts as parts_mod
 from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
@@ -78,6 +78,15 @@ def find_footprint(query: str = "", pattern: str = "", limit: int = 15) -> dict:
     """Search footprints. query: words that must all appear ('R 0805', 'soic 8').
     pattern: symbol fp_filters wildcards ('R_* LED*'). Returns 'Lib:Name'."""
     return {"footprints": library.find_footprints(query, pattern, limit)}
+
+
+@tool
+def import_lcsc_part(lcsc: str, compare_footprint: str = "") -> dict:
+    """Import an LCSC part (symbol + footprint + 3D) into the pcbmcp_lcsc library when no
+    KiCad symbol/footprint fits. Checks pin<->pad and, if KiCad has the same part's footprint
+    (or compare_footprint given), whether pad numbering matches. On kicad_footprint_mismatch
+    do NOT mix: use the KiCad footprint with a KiCad-numbered symbol. Verify vs datasheet."""
+    return importer.import_part(lcsc, compare_footprint)
 
 
 @tool

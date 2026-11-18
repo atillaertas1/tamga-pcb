@@ -23,14 +23,14 @@ Neden böyle:
 ## Token verimliliği
 | Önlem | Etki |
 |---|---|
-| 18 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
+| 19 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
 | Ham `.kicad_pcb` yok; footprint başına 1 satır | 7 parçalı kart özeti ≈ 900 karakter |
 | DRC/ERC türe göre gruplu, 3 örnek konum | 300 ihlal → ~1 KB |
 | Parça başına 1 satır, basic önce | 20 sonuç yerine 8 satır |
 | Kurallar/checklist skill'de | sadece PCB işinde bağlama yüklenir |
 
 ## Araçlar
-**Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `sync_design`
+**Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
 
 **Kart:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
 `fill_zones`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
@@ -78,6 +78,16 @@ Tek doğruluk kaynağı `<name>.circuit.json`:
 
 Pin anahtarı numara (`"1"`) veya ad (`"A"`, `"VI"`) olabilir. Yanlış pin adında hiçbir dosya
 yazılmaz, mevcut pinler listelenir. Düzenleme için `patch={parts:[{ref:"R1", value:"470"}], remove:["C1"]}`.
+
+Doğrulama: her senkronda pin↔pad numara kontrolü (eksik pad = hiçbir dosya yazılmaz) ve
+`lcsc` olan parçalarda sembol pinout'u ↔ gerçek LCSC parçası (EasyEDA verisi, uyarı olarak).
+Stok olmayan kütüphaneler (`pcbmcp_custom`, `pcbmcp_lcsc`) projenin `sym-lib-table`/`fp-lib-table`'ına
+otomatik eklenir.
+
+KiCad'de olmayan parça: `import_lcsc_part("C597931")` → `symbols/pcbmcp_lcsc.kicad_sym`,
+`footprints/pcbmcp_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
+footprint'i varsa pad numaralandırması karşılaştırılır (ör. Hirose DF40'ta EasyEDA U-numaralı,
+KiCad tek/çift → 100/100 pad farklı; uyarı verir).
 
 Sınırlar: tek sayfa (hiyerarşik sheet yok); şematik okunur ama "label stili" (tel çizimi yok);
 `.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.

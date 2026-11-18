@@ -271,6 +271,17 @@ def footprint_pads(fid: str) -> list[str]:
     return sorted({str(p[1]) for p in children(tree, "pad") if str(p[1])}, key=_natural)
 
 
+def pad_positions(fid: str) -> dict[str, tuple[float, float]]:
+    """{pad_no: (x, y)} mm, footprint koordinatında. Aynı numaralı çoklu pad'de (EP) ilki."""
+    tree = sexpr.parse(footprint_file(fid).read_text(encoding="utf-8"))
+    out = {}
+    for p in children(tree, "pad"):
+        num, at = str(p[1]), child(p, "at")
+        if num and at is not None and num not in out:
+            out[num] = (float(at[1]), float(at[2]))
+    return out
+
+
 def check_pin_pad(lib_id: str, fid: str) -> dict[str, list[str]]:
     """Sembol pin numaraları ile footprint pad numaralarını karşılaştır (sadece numara düzeyi).
 

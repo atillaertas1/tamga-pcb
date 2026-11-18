@@ -18,7 +18,11 @@ bir sonraki `sync_design`'da ezilir, değişikliği spec'e yap.
 2. Her parça için: `find_symbol` → `get_symbol(lib_id, footprint)` ile pin adlarını ve
    footprint pad numaralarının eşleştiğini doğrula → `find_footprint` (sembolün `fp_filters`'ı ile).
    Pasiflerin değerini hesapla ve gerekçesini kullanıcıya yaz (ör. LED: R = (Vin−Vf)/I).
-3. `search_parts` ile LCSC kodu seç, spec'e `lcsc` olarak koy.
+3. `search_parts` ile LCSC kodu seç, spec'e `lcsc` olarak koy. Sonra
+   `get_symbol(lib_id, footprint, lcsc)` → `pinout_check` `mismatch` verirse yanlış sembol
+   varyantı / yanlış parça / LED polaritesi olabilir: datasheet'e bakmadan geçme.
+   KiCad'de uygun sembol/footprint yoksa `import_lcsc_part(lcsc)`. `kicad_footprint_mismatch`
+   dönerse EasyEDA footprint'ini KiCad sembolüyle **karıştırma** (pad numaralandırması farklı).
 4. `sync_design(project_dir, name, spec)` → `netlist_check: OK`, `erc: CLEAN`, `parity: OK` olmalı.
    - `pin_not_connected` → ya bağla ya `nc` listesine ekle (bilinçli karar ver, hepsine `*` deme).
    - `pwr_flags_added` normaldir.
