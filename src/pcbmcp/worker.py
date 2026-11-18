@@ -620,7 +620,93 @@ def cmd_sync_pcb(a: dict) -> dict:
     return out
 
 
+def _pad(b, spec: str, net: str):
+    """'U1.3' -> pad; netin üzerinde olmalı. Aynı numaralı birden çok pad (tab) varsa hepsi aday."""
+    ref, _, num = spec.partition(".")
+    fp = b.FindFootprintByReference(ref)
+    if fp is None or not num:
+        raise KeyError(f"pad '{spec}': use REF.PAD (e.g. U1.3)")
+    pads = [p for p in fp.Pads() if p.GetNumber() == num]
+    if not pads:
+        raise KeyError(f"{ref} has no pad {num}")
+    on_net = [p for p in pads if p.GetNetname() == net]
+    if not on_net:
+        raise KeyError(f"{spec} is on net '{pads[0].GetNetname()}', not '{net}'")
+    return on_net
+
+
+def cmd_route_net(a: dict) -> dict:
+    """Elle yönlendirilmiş rota: from_pad -> points -> to_pad. Nokta [x, y] ya da [x, y, layer];
+    katman değişince o noktaya via. İzler KİLİTLİ: sonraki autoroute bunlara dokunmaz."""
+    path = a["pcb"]
+    b = load(path)
+    net = b.FindNet(a["net"])
+    if net is None:
+        raise KeyError(f"net {a['net']} not found")
+    ns = b.GetDesignSettings().m_NetSettings
+    cls = ns.GetEffectiveNetClass(a["net"])
+    width = pcbnew.FromMM(a["width_mm"]) if a.get("width_mm") else cls.GetTrackWidth()
+    layer = a.get("layer", "F.Cu")
+    starts, ends = _pad(b, a["from_pad"], a["net"]), _pad(b, a["to_pad"], a["net"])
+
+    # nokta listesi: (x, y, katman); katman verilmezse bir öncekinin katmanı
+    pts = []
+    for q in a.get("points", []):
+        layer = q[2] if len(q) > 2 else layer
+        pts.append((pcbnew.FromMM(float(q[0])), pcbnew.FromMM(float(q[1])), layer))
+    first_layer = pts[0][2] if pts else layer
+    last_layer = pts[-1][2] if pts else layer
+
+    def pick(pads, lname, near):
+        ok = [p for p in pads if p.IsOnLayer(b.GetLayerID(lname))]
+        if not ok:
+            raise ValueError(f"pad {pads[0].GetParentFootprint().GetReference()}.{pads[0].GetNumber()} "
+                             f"is not on {lname}; start/end on its layer or add a via point")
+        return min(ok, key=lambda p: (p.GetPosition() - near).EuclideanNorm())
+
+    first_target = pcbnew.VECTOR2I(*pts[0][:2]) if pts else ends[0].GetPosition()
+    sp = pick(starts, first_layer, first_target).GetPosition()
+    last_from = pcbnew.VECTOR2I(*pts[-1][:2]) if pts else sp
+    ep = pick(ends, last_layer, last_from).GetPosition()
+
+    before = unrouted(b)
+    chain = [(sp.x, sp.y, first_layer), *pts, (ep.x, ep.y, last_layer)]
+    segs = vias = 0
+    length = 0.0
+    for (x0, y0, l0), (x1, y1, l1) in zip(chain, chain[1:]):
+        if l1 != l0:  # katman geçişi: önceki noktaya via, segment yeni katmanda
+            v = pcbnew.PCB_VIA(b)
+            v.SetViaType(pcbnew.VIATYPE_THROUGH)
+            v.SetPosition(pcbnew.VECTOR2I(x0, y0))
+            v.SetWidth(cls.GetViaDiameter())
+            v.SetDrill(cls.GetViaDrill())
+            v.SetNet(net)
+            v.SetLocked(True)
+            b.Add(v)
+            vias += 1
+        if (x0, y0) == (x1, y1):
+            continue
+        s = pcbnew.PCB_TRACK(b)
+        s.SetStart(pcbnew.VECTOR2I(x0, y0))
+        s.SetEnd(pcbnew.VECTOR2I(x1, y1))
+        s.SetWidth(width)
+        s.SetLayer(b.GetLayerID(l1))
+        s.SetNet(net)
+        s.SetLocked(True)
+        b.Add(s)
+        segs += 1
+        length += mm(int(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5))
+    after = unrouted(b)
+    bk = backup(path)
+    pcbnew.SaveBoard(path, b)
+    return {"net": a["net"], "segments": segs, "vias": vias, "length_mm": round(length, 2),
+            "width_mm": mm(width), "unrouted_before": before, "unrouted_after": after,
+            "locked": True, "backup": bk,
+            "note": "Run run_drc: points are taken as given (no clearance check here)."}
+
+
 COMMANDS = {
+    "route_net": cmd_route_net,
     "sync_pcb": cmd_sync_pcb,
     "set_netclass": cmd_set_netclass,
     "fab_tables": cmd_fab_tables,

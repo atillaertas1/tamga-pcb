@@ -181,6 +181,18 @@ def fill_zones(pcb_path: str) -> dict:
 
 
 @tool
+def route_net(pcb_path: str, net: str, from_pad: str, to_pad: str,
+              points: list[list] | None = None, layer: str = "F.Cu", width_mm: float = 0) -> dict:
+    """Hand-guided route for a critical net: from_pad ('U1.3') -> points -> to_pad.
+    points: [[x,y], [x,y,'B.Cu'], ...] mm; a layer change drops a via at that point.
+    Width defaults to the net's netclass. Tracks are locked so autoroute keeps them.
+    Route these BEFORE autoroute; then run_drc (no clearance check here)."""
+    return run_worker("route_net", {"pcb": abspath(pcb_path), "net": net, "from_pad": from_pad,
+                                    "to_pad": to_pad, "points": points or [], "layer": layer,
+                                    "width_mm": width_mm or None})
+
+
+@tool
 def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
               ignore_netclasses: list[str] | None = None, timeout_s: int = 900,
               ctx: Context = None) -> dict:

@@ -112,3 +112,39 @@ def test_dsn_export(board, tmp_path):
     run_worker("export_dsn", {"pcb": board, "dsn": str(dsn)})
     text = dsn.read_text()
     assert text.lstrip().startswith("(pcb") and "(net VIN" in text
+
+
+def _locked(path):
+    out = subprocess.run([KICAD_PYTHON, "-c", (
+        "import pcbnew,sys; b=pcbnew.LoadBoard(sys.argv[1]); "
+        "print(sorted((t.GetClass(),t.GetNetname(),t.GetLayerName(),t.GetStart().x,t.GetStart().y,"
+        "t.GetEnd().x,t.GetEnd().y) for t in b.GetTracks() if t.IsLocked()))"), path],
+        capture_output=True, text=True, check=True).stdout
+    return out.strip().splitlines()[-1]
+
+
+def test_route_net_with_via_and_errors(board):
+    r = server.route_net(board, "VIN", "J1.1", "C1.1", [[106.5, 108.0], [106.5, 104.0]])
+    assert (r["segments"], r["vias"], r["unrouted_after"]) == (3, 0, r["unrouted_before"] - 1)
+    r = server.route_net(board, "GND", "J1.2", "D1.1",
+                         [[106, 110.54], [106, 114, "B.Cu"], [115.06, 114], [115.06, 114.5, "F.Cu"]])
+    assert r["vias"] == 2 and r["unrouted_after"] == r["unrouted_before"] - 1
+    assert "'VIN'" in _locked(board) and "PCB_VIA" in _locked(board)
+    drc = server.run_drc(board, refill_zones=False)
+    assert {t["type"] for t in drc["types"]} == {"unconnected_items"}  # el rotası çakışma üretmedi
+    with pytest.raises(KicadError, match="J1.2 is on net 'GND', not 'VIN'"):
+        server.route_net(board, "VIN", "J1.2", "C1.1")
+    with pytest.raises(KicadError, match="C1.1 is not on B.Cu"):
+        server.route_net(board, "VIN", "J1.1", "C1.1", [[105, 108, "B.Cu"]])
+
+
+@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file()
+                    or shutil.which("java") is None, reason="freerouting.jar/java missing")
+def test_autoroute_keeps_hand_routes(board, monkeypatch):
+    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    server.route_net(board, "GND", "J1.2", "D1.1",
+                     [[106, 110.54], [106, 114, "B.Cu"], [115.06, 114], [115.06, 114.5, "F.Cu"]])
+    before = _locked(board)
+    r = server.autoroute(board, max_passes=20)
+    assert r["unrouted_after"] == 0 and _locked(r["out"]) == before
+    assert server.run_drc(r["out"], refill_zones=False).get("verdict") == "CLEAN"

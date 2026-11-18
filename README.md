@@ -23,7 +23,7 @@ Neden böyle:
 ## Token verimliliği
 | Önlem | Etki |
 |---|---|
-| 19 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
+| 20 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
 | Ham `.kicad_pcb` yok; footprint başına 1 satır | 7 parçalı kart özeti ≈ 900 karakter |
 | DRC/ERC türe göre gruplu, 3 örnek konum | 300 ihlal → ~1 KB |
 | Parça başına 1 satır, basic önce | 20 sonuç yerine 8 satır |
@@ -33,7 +33,7 @@ Neden böyle:
 **Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
 
 **Kart:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
-`fill_zones`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
+`fill_zones`, `route_net`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
 `import_board` (Altium `.PcbDoc`, Eagle, PADS, CADSTAR...).
 
 ## Kurulum
@@ -41,7 +41,7 @@ Neden böyle:
 cd ~/Documents/Personal/pcb-deneme
 uv sync
 uv run pcbmcp doctor --fix   # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir (v2.5.0, Java 25+)
-uv run pytest -q          # 54 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
+uv run pytest -q          # 56 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
 ```
 Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
 Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.
@@ -107,6 +107,6 @@ Sınırlar: sheet kutularında hiyerarşik pin yok (portlar yazı olarak); şema
 - [x] Şematik üretimi (spec → .kicad_sch + PCB senkronu)
 - [x] Devre blokları + hiyerarşik sheet'ler
 - [ ] Güç sembolleri, sheet kutularında hiyerarşik pinler
-- [ ] Kritik net için `route_net(net, waypoints)` (elle yön verilen rota)
+- [x] Kritik net için `route_net` (elle yön verilen, kilitli rota; autoroute dokunmaz)
 - [ ] DeepPCB/Quilter API alternatif router
 - [ ] ngspice ile analog blok simülasyonu

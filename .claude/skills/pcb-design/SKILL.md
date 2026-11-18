@@ -46,7 +46,9 @@ bir sonraki `sync_design`'da ezilir, değişikliği spec'e yap.
    - `unmatched_nets` dönerse net adını `board_summary`'den düzelt.
    - Rotadan sonra değiştirirsen `apply_to_existing=True` + `run_drc`.
    - Kritik netler (USB diff pair, RF, yüksek hız) → kullanıcıya bırak veya açıkça işaretle.
-5. `autoroute` → `add_copper_zone` (varsayılan: GND, iki katman + 5 mm stitching via) → `run_drc`.
+5. Kritik netler (izolasyon bariyeri yakını, kısa tutulması gereken güç yolu, hassas analog):
+   önce `route_net(net, 'U1.3', 'C5.1', points)` ile elle yönlendir (kilitli kalır). Sonra
+   `autoroute` → `add_copper_zone` (varsayılan: GND, iki katman + 5 mm stitching via) → `run_drc`.
 6. DRC `CLEAN` olana kadar: en çok sayıdaki ihlal türünden başla, `examples` konumlarını kullan.
 7. `export_fab` → `missing_lcsc` boş olmalı; kalan varsa kullanıcıya listele.
 
