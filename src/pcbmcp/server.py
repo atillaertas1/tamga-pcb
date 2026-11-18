@@ -18,7 +18,7 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
-from . import design, library, report, route
+from . import design, library, pinout, report, route
 from . import parts as parts_mod
 from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
@@ -58,14 +58,18 @@ def find_symbol(query: str, limit: int = 10) -> dict:
 
 
 @tool
-def get_symbol(lib_id: str, footprint: str = "") -> dict:
+def get_symbol(lib_id: str, footprint: str = "", lcsc: str = "") -> dict:
     """Pins of a symbol as 'number:name:type' (+unit). Call before using a symbol in a spec.
     If footprint given, also lists its pad numbers and a pin<->pad check
-    (missing_pads = error, unused_pads = pad left unconnected)."""
+    (missing_pads = error, unused_pads = pad left unconnected).
+    If lcsc given, compares pin names with the real part's pinout (mismatch = wrong symbol
+    variant or wrong part; part_only = extra pins such as a tab)."""
     out = library.describe_symbol(lib_id)
     if footprint:
         out["footprint_pads"] = " ".join(library.footprint_pads(footprint))
         out["pad_check"] = library.check_pin_pad(lib_id, footprint)
+    if lcsc:
+        out["pinout_check"] = pinout.check(lib_id, lcsc)
     return out
 
 

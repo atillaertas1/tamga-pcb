@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import library, report, schematic, sexpr
+from . import library, pinout, report, schematic, sexpr
 from .kicad import abspath, cli, drc_json, erc_json, run_worker
 
 
@@ -89,6 +90,27 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
     if pad_errors:
         raise ToolError("pin/pad mismatch (nothing written): " + "; ".join(pad_errors))
 
+    # sembol pinout'u <-> gerçek LCSC parçası. Sezgisel isim eşleştirmesi -> uyarı, hata değil.
+    # Ağ yoksa parça 'pinout_unchecked'a düşer; sonuçlar diskte cache'lenir.
+    lcsc_parts = [p for p in spec["parts"] if p.get("lcsc")]
+    pinout_warnings, pinout_unchecked = [], []
+
+    def _pin_check(p):
+        try:
+            return p, pinout.check(p["symbol"], p["lcsc"])
+        except ToolError:
+            return p, None
+
+    with ThreadPoolExecutor(max_workers=3) as ex:  # EasyEDA ~90 hızlı istekte 403 veriyor
+        for p, res in ex.map(_pin_check, lcsc_parts):
+            if res is None:
+                pinout_unchecked.append(p["ref"])
+            elif "pinout" not in res:
+                issues = res.get("mismatch", []) + [f"part-only pin {x}" for x in res.get("part_only", [])]
+                if res.get("symbol_only"):
+                    issues.append(f"symbol-only pins {res['symbol_only']}")
+                pinout_warnings.append(f"{p['ref']} ({p['lcsc']} {res['part']}): " + "; ".join(issues))
+
     paths["spec"].write_text(json.dumps(spec, indent=1, ensure_ascii=False) + "\n")
     paths["sch"].write_text(text)
 
@@ -132,4 +154,8 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
         out["no_footprint"] = missing_fp
     if pad_warnings:
         out["pad_warnings"] = pad_warnings
+    if pinout_warnings:
+        out["pinout_warnings"] = pinout_warnings
+    if pinout_unchecked:
+        out["pinout_unchecked"] = pinout_unchecked
     return out

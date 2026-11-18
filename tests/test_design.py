@@ -110,6 +110,20 @@ def test_missing_pad_writes_nothing(tmp_path):
     assert (tmp_path / "led.kicad_sch").read_text() == before
 
 
+def test_pinout_warning_in_sync(tmp_path, monkeypatch):
+    from pcbmcp import pinout
+    from test_pinout import easyeda
+    db = {"C2286": easyeda("KT-0603R", {"1": "A", "2": "K"})}
+    monkeypatch.setattr(pinout, "_fetch", lambda lcsc: db[lcsc] if lcsc in db else
+                        (_ for _ in ()).throw(ToolError("offline")))
+    spec = json.loads(json.dumps(LED_SPEC))
+    spec["parts"][2]["lcsc"] = "C2286"
+    r = design.sync(str(tmp_path), "led", spec, None)
+    assert r["pinout_warnings"] == ["D1 (C2286 KT-0603R): 1: symbol K, part A; 2: symbol A, part K"]
+    assert r["pinout_unchecked"] == ["R1"]  # C17630 "ağda yok" -> kontrol edilemedi, akış durmadı
+    assert r["netlist_check"] == "OK"
+
+
 def test_multi_unit_power_flags_and_nc(tmp_path):
     spec = {"board": {"width_mm": 30, "height_mm": 20}, "parts": [
         {"ref": "J1", "symbol": "Connector_Generic:Conn_01x03",
