@@ -16,7 +16,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from mcp.server.mcpserver import MCPServer
+import anyio.from_thread
+from mcp.server.mcpserver import Context, MCPServer
 
 from . import design, importer, library, pinout, report, route
 from . import parts as parts_mod
@@ -176,11 +177,20 @@ def fill_zones(pcb_path: str) -> dict:
 
 @tool
 def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
-              ignore_netclasses: list[str] | None = None) -> dict:
+              ignore_netclasses: list[str] | None = None, timeout_s: int = 900,
+              ctx: Context = None) -> dict:
     """Autoroute with Freerouting (headless). Writes <name>_routed.kicad_pcb unless out_path
-    given. Reports unrouted before/after. Route critical nets by hand first, then run this."""
+    given. Reports unrouted before/after. Route critical nets by hand first, then run this.
+    Sends progress per pass; on timeout reports the pass reached (nothing is written)."""
+    on_progress = None
+    if ctx is not None:
+        def on_progress(msg: str, n: int) -> None:
+            try:  # araç thread'de çalışıyor; async bildirimi event loop'a gönder
+                anyio.from_thread.run(ctx.report_progress, n, max_passes, msg)
+            except Exception:  # istemci progress token vermediyse vb. — rotayı bozma
+                pass
     return route.autoroute(abspath(pcb_path), abspath(out_path) if out_path else None,
-                           max_passes, ignore_netclasses)
+                           max_passes, ignore_netclasses, timeout_s, on_progress)
 
 
 # ------------------------------------------------------------------ doğrulama

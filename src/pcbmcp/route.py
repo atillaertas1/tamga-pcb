@@ -5,9 +5,14 @@ kicad-cli 10'da DSN export/SES import YOK; bu yüzden pcbnew worker'ı kullanıl
 from __future__ import annotations
 
 import os
+import queue
+import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from .kicad import KicadError, run_worker
@@ -27,8 +32,43 @@ def jar_path() -> Path:
     return p
 
 
+# "Auto-routing pass #3 on board '..' was completed in 0.14 seconds with score 1000.00 (0 unrouted and 0 violations)."
+_PASS = re.compile(r"(Fanout|Auto-routing|Optimizer) pass #(\d+) .*?\((\d+) unrouted and (\d+) violations\)")
+
+
+class Progress:
+    """Freerouting log'undan son durum: aşama, geçiş no, unrouted, violations."""
+
+    def __init__(self, on_update: Callable[[str, int], None] | None = None):
+        self.stage, self.n, self.unrouted, self.violations = "starting", 0, None, None
+        self.routing_passes = self.optimizer_passes = 0
+        self.tail: list[str] = []
+        self._on_update = on_update
+
+    def feed(self, line: str) -> None:
+        self.tail = (self.tail + [line.rstrip()])[-20:]
+        m = _PASS.search(line)
+        if not m:
+            return
+        self.stage, self.n = m.group(1).lower(), int(m.group(2))
+        self.unrouted, self.violations = int(m.group(3)), int(m.group(4))
+        if self.stage == "auto-routing":
+            self.routing_passes = self.n
+        elif self.stage == "optimizer":
+            self.optimizer_passes = self.n
+        if self._on_update:
+            self._on_update(self.summary(), self.routing_passes)
+
+    def summary(self) -> str:
+        if self.unrouted is None:
+            return self.stage
+        return f"{self.stage} pass {self.n}: {self.unrouted} unrouted, {self.violations} violations"
+
+
 def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
-              ignore_netclasses: list[str] | None = None, timeout: int = 900) -> dict:
+              ignore_netclasses: list[str] | None = None, timeout: int = 900,
+              on_progress: Callable[[str, int], None] | None = None) -> dict:
+    """on_progress(message, routing_pass) her geçişte çağrılır (MCP progress bildirimi için)."""
     jar = jar_path()
     out = out or str(Path(pcb).with_name(Path(pcb).stem + "_routed.kicad_pcb"))
     work = Path(tempfile.mkdtemp(prefix="pcbmcp-route-"))
@@ -40,11 +80,44 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
                "--logging.file.enabled=false", "-da"]
         if ignore_netclasses:
             cmd += ["-inc", ",".join(ignore_netclasses)]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        # Çıktıyı canlı oku: ilerleme + zaman aşımında "nerede kaldı" bilgisi.
+        # Freerouting'in süre sınırı yok ve SES'i sadece sonda yazar -> kesilirse rota kaybolur.
+        # on_progress ÇAĞIRANIN thread'inde çağrılmalı (MCP: anyio.from_thread sadece aracın
+        # worker thread'inden çalışır) -> okuyucu thread kuyruğa yazar, burada boşaltılır.
+        updates: queue.Queue = queue.Queue()
+        prog = Progress(lambda msg, n: updates.put((msg, n)))
+        t0 = time.monotonic()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        reader = threading.Thread(target=lambda: [prog.feed(l) for l in proc.stdout], daemon=True)
+        reader.start()
+
+        def drain():
+            while not updates.empty():
+                msg, n = updates.get_nowait()
+                if on_progress:
+                    on_progress(msg, n)
+
+        while proc.poll() is None and time.monotonic() - t0 < timeout:
+            try:
+                proc.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+            drain()
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+            raise KicadError(
+                f"freerouting timed out after {timeout}s at {prog.summary()}; nothing was written. "
+                f"Retry with fewer max_passes (now {max_passes}), a larger timeout_s, or route "
+                f"critical/power nets first and exclude their netclass (ignore_netclasses).")
+        reader.join(timeout=5)
+        drain()
         if not ses.is_file():
-            raise KicadError(f"freerouting produced no SES (exit {proc.returncode}): "
-                             f"{(proc.stderr or proc.stdout)[-800:]}")
+            tail = "\n".join(l for l in prog.tail if "WARNING" not in l)[-800:]
+            raise KicadError(f"freerouting produced no SES (exit {proc.returncode}): {tail}")
         res = run_worker("import_ses", {"pcb": pcb, "ses": str(ses), "out": out})
+        res["freerouting"] = (f"{prog.routing_passes} routing + {prog.optimizer_passes} optimizer passes "
+                              f"in {time.monotonic() - t0:.0f}s")
         res["note"] = "Run run_drc on the routed board; review power/critical nets by eye."
         return res
     finally:

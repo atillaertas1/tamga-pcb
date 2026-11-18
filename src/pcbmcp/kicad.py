@@ -26,10 +26,13 @@ def abspath(p: str) -> str:
 
 def run_worker(cmd: str, args: dict, timeout: int = 300) -> dict:
     """worker.py'yi sistem Python'u ile çalıştır, son işaretli JSON satırını döndür."""
-    proc = subprocess.run(
-        [KICAD_PYTHON, str(WORKER), cmd, json.dumps(args)],
-        capture_output=True, text=True, timeout=timeout,
-    )
+    try:
+        proc = subprocess.run(
+            [KICAD_PYTHON, str(WORKER), cmd, json.dumps(args)],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:  # ToolError değilse model sadece "Error executing tool" görür
+        raise KicadError(f"worker '{cmd}' timed out after {timeout}s") from None
     for line in reversed(proc.stdout.splitlines()):
         if line.startswith(MARK):
             res = json.loads(line[len(MARK):])
@@ -52,7 +55,10 @@ def _clear_stale_locks(args: tuple[str, ...]) -> None:
 def cli(*args: str, timeout: int = 300, ok_codes: tuple[int, ...] = (0,),
         retries: int = 2) -> subprocess.CompletedProcess:
     for attempt in range(retries + 1):
-        proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, timeout=timeout)
+        try:
+            proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise KicadError(f"kicad-cli {' '.join(args[:3])} timed out after {timeout}s") from None
         # Negatif kod = sinyal (KiCad 10.0.7'de aralıklı 'double free' çökmesi görüldü): tekrar dene
         if proc.returncode >= 0 or attempt == retries:
             break
