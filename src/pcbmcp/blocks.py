@@ -50,6 +50,7 @@ def expand(spec: dict) -> dict:
     flat = {k: v for k, v in spec.items() if k not in ("blocks", "instances")}
     flat["parts"] = list(copy.deepcopy(spec.get("parts") or []))
     names = set()
+    flat["sheets"] = {}  # şematik sayfaları için: {instance: {block, ports: ["PORT = net"]}}
     local_nets: dict[str, str] = {}  # yerel net -> instance (çakışma kontrolü)
     for i, inst in enumerate(insts):
         name, bname = inst.get("name"), inst.get("block")
@@ -70,6 +71,9 @@ def expand(spec: dict) -> dict:
         base = int(inst.get("ref_base", 100 * (i + 1)))
 
         prefix = inst.get("net_prefix", f"{name}_")
+        flat["sheets"][name] = {"block": bname, "ports": [
+            f"{pt} = {inst.get('nets', {}).get(pt, pt)}" for pt in block.get("ports", [])
+            if inst.get("nets", {}).get(pt, pt) is not None]}
 
         def net(n: str) -> str:
             if n in ports:

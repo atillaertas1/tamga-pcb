@@ -172,6 +172,12 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
 
     paths["spec"].write_text(json.dumps(source, indent=1, ensure_ascii=False) + "\n")
     paths["sch"].write_text(text)
+    # blok instance sayfaları; artık kullanılmayan (bizim ürettiğimiz) sayfaları sil
+    for fname, page_text in meta["pages"].items():
+        (paths["dir"] / fname).write_text(page_text)
+    for old in paths["dir"].glob(f"{name}-*.kicad_sch"):
+        if old.name not in meta["pages"] and '(generator "pcbmcp")' in old.read_text()[:300]:
+            old.unlink()
     libs_added = ensure_lib_tables(paths["dir"], spec)
 
     with tempfile.TemporaryDirectory() as tmp:

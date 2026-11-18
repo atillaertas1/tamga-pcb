@@ -584,9 +584,10 @@ def cmd_sync_pcb(a: dict) -> dict:
                 added.append(ref)
             b.Add(fp)
         fp.SetValue(p.get("value") or fp.GetValue())
-        fp.SetPath(pcbnew.KIID_PATH(f"/{p['sym_uuid']}"))
-        fp.SetSheetname("/")
-        fp.SetSheetfile(a["sheetfile"])
+        # hiyerarşik sayfadaki sembol: yol /<sheet_uuid>/<sym_uuid>, sheetname /<instance>/
+        fp.SetPath(pcbnew.KIID_PATH(p.get("path") or f"/{p['sym_uuid']}"))
+        fp.SetSheetname(p.get("sheetname") or "/")
+        fp.SetSheetfile(p.get("sheetfile") or a["sheetfile"])
         fp.SetDNP(bool(p.get("dnp")))
         if p.get("lcsc"):
             _set_field(fp, "LCSC", p["lcsc"])

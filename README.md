@@ -95,14 +95,18 @@ ile eski ref ve net adları korunur: cm3-carrier'daki iki MAX3232 bloklaştırı
 birebir aynı kaldı. Net adı değişirse `nets_gone` raporlanır; `.kicad_dru`'da o ada bakan kural varsa
 `dru_rules_reference_gone_nets` uyarır (bağlantı doğru olsa da kural sessizce devre dışı kalır).
 
-Sınırlar: tek sayfa (hiyerarşik sheet yok); şematik okunur ama "label stili" (tel çizimi yok);
+Her blok instance'ı kendi şematik sayfasına gider (`<ad>-<instance>.kicad_sch`); kök sayfada sheet kutusu
+ve port eşlemesi yazılır. Bağlantı global label ile kalır, net adları hiyerarşiden etkilenmez.
+
+Sınırlar: sheet kutularında hiyerarşik pin yok (portlar yazı olarak); şematik okunur ama "label stili" (tel çizimi yok);
 `.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.
 
 ## Yol haritası
 - [ ] kipy (IPC) backend: açık KiCad'de canlı düzenleme
 - [x] Netclass yönetimi (güç netleri için geniş iz) — `set_netclass`
 - [x] Şematik üretimi (spec → .kicad_sch + PCB senkronu)
-- [ ] Hiyerarşik sheet'ler, güç sembolleri
+- [x] Devre blokları + hiyerarşik sheet'ler
+- [ ] Güç sembolleri, sheet kutularında hiyerarşik pinler
 - [ ] Kritik net için `route_net(net, waypoints)` (elle yön verilen rota)
 - [ ] DeepPCB/Quilter API alternatif router
 - [ ] ngspice ile analog blok simülasyonu

@@ -89,6 +89,17 @@ def test_sync_with_blocks(tmp_path):
     # patch ile tek instance'ın değeri: yerleşim korunur, yeni parça eklenmez
     r = design.sync(str(tmp_path), "blk", None, {"instances": [{"name": "STAT", "set": {"R1": {"value": "330"}}}]})
     assert r["pcb"]["added"] == [] and r["pcb"]["updated"] == 5
+    # hiyerarşi: her instance kendi sayfası; kök sayfada sheet kutusu + port listesi
+    assert {f.name for f in tmp_path.glob("*.kicad_sch")} == {"blk.kicad_sch", "blk-PWR.kicad_sch", "blk-STAT.kicad_sch"}
+    root = (tmp_path / "blk.kicad_sch").read_text()
+    assert root.count("(sheet\n") == 2 and '"Sheetfile" "blk-PWR.kicad_sch"' in root and "VIN = +5V" in root
+    assert '(reference "R101")' in (tmp_path / "blk-PWR.kicad_sch").read_text()
+    # instance silinince sayfası da silinir, parçaları PCB'den çıkar
+    r = design.sync(str(tmp_path), "blk", None, {"remove_instances": ["STAT"]})
+    assert not (tmp_path / "blk-STAT.kicad_sch").exists() and sorted(r["pcb"]["removed"]) == ["D201", "R201"]
+    assert r["parity"] == "OK"
+    # +3V3 artık sadece J1'e gidiyor: ERC bunu doğru yakalar (gerçek tasarım uyarısı, hata değil)
+    assert [t["type"] for t in r["erc"]["types"]] == ["isolated_pin_label"]
 
 
 def test_null_port_leaves_pin_unconnected():
