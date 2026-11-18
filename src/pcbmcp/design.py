@@ -12,7 +12,7 @@ from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import report, schematic, sexpr
+from . import library, report, schematic, sexpr
 from .kicad import abspath, cli, drc_json, erc_json, run_worker
 
 
@@ -76,6 +76,19 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
         raise ToolError("spec errors (nothing written): " + "; ".join(meta["errors"]))
     missing_fp = [p["ref"] for p in spec["parts"] if not p.get("footprint")]
 
+    # pin<->pad: dosya yazmadan ÖNCE. Eksik pad = hata (net PCB'ye gitmez), boş pad = uyarı.
+    pad_errors, pad_warnings = [], []
+    for p in spec["parts"]:
+        if not p.get("footprint"):
+            continue
+        chk = library.check_pin_pad(p["symbol"], p["footprint"])
+        if chk["missing_pads"]:
+            pad_errors.append(f"{p['ref']}: pins {chk['missing_pads']} have no pad in {p['footprint']}")
+        if chk["unused_pads"]:
+            pad_warnings.append(f"{p['ref']}: pads {chk['unused_pads']} have no symbol pin (left unconnected)")
+    if pad_errors:
+        raise ToolError("pin/pad mismatch (nothing written): " + "; ".join(pad_errors))
+
     paths["spec"].write_text(json.dumps(spec, indent=1, ensure_ascii=False) + "\n")
     paths["sch"].write_text(text)
 
@@ -117,4 +130,6 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
         out["pwr_flags_added"] = meta["pwr_flags"]
     if missing_fp:
         out["no_footprint"] = missing_fp
+    if pad_warnings:
+        out["pad_warnings"] = pad_warnings
     return out

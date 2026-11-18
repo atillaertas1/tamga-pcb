@@ -251,3 +251,27 @@ def _natural(s: str):
 def footprint_pads(fid: str) -> list[str]:
     tree = sexpr.parse(footprint_file(fid).read_text(encoding="utf-8"))
     return sorted({str(p[1]) for p in children(tree, "pad") if str(p[1])}, key=_natural)
+
+
+def check_pin_pad(lib_id: str, fid: str) -> dict[str, list[str]]:
+    """Sembol pin numaraları ile footprint pad numaralarını karşılaştır (sadece numara düzeyi).
+
+    Dönüş (boş listeler anahtarıyla birlikte döner, sıralama _natural ile):
+      missing_pads: sembolde olup footprint'te pad'i OLMAYAN pin numaraları.
+                    -> HATA: o pinin neti PCB'ye hiç gitmez.
+      unused_pads:  footprint'te olup sembolde pini OLMAYAN pad numaraları.
+                    -> UYARI: pad net'siz kalır (ör. SOT-223 tab'ı = pad 4; bilinçli olabilir).
+
+    Örnek: check_pin_pad("Regulator_Linear:AMS1117-3.3", "Package_TO_SOT_SMD:SOT-223")
+           -> {"missing_pads": [], "unused_pads": ["4"]}
+
+    İpuçları:
+      - Pinler: symbol_pins(resolve_symbol(lib_id)) -> her biri {"number": ..., ...}.
+        Çok birimli sembollerde (LM358) aynı numara birden çok kez gelebilir; küme kullan.
+      - Numarası boş ("") pin olabilir; onu sayma (footprint_pads boş pad'leri zaten atıyor).
+      - Pad'ler: footprint_pads(fid).
+    """
+    pins = {p["number"] for p in symbol_pins(resolve_symbol(lib_id)) if p["number"]}
+    pads = set(footprint_pads(fid))
+    return {"missing_pads": sorted(pins - pads, key=_natural),
+            "unused_pads": sorted(pads - pins, key=_natural)}

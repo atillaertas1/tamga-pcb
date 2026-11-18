@@ -89,6 +89,27 @@ def test_bad_pin_writes_nothing(tmp_path):
     assert (tmp_path / "led.kicad_sch").read_text() == before
 
 
+def test_check_pin_pad():
+    ok = library.check_pin_pad("Device:R", "Resistor_SMD:R_0805_2012Metric")
+    assert ok == {"missing_pads": [], "unused_pads": []}
+    tab = library.check_pin_pad("Regulator_Linear:AMS1117-3.3", "Package_TO_SOT_SMD:SOT-223")
+    assert tab == {"missing_pads": [], "unused_pads": ["4"]}
+    # LM358: 3 birim, 8 pin (tekrarlı numara yok sayılmalı) -> 3 pad'li kılıfta 4..8 eksik
+    bad = library.check_pin_pad("Amplifier_Operational:LM358", "Package_TO_SOT_SMD:SOT-223-3_TabPin2")
+    assert bad == {"missing_pads": ["4", "5", "6", "7", "8"], "unused_pads": []}
+
+
+def test_missing_pad_writes_nothing(tmp_path):
+    d = str(tmp_path)
+    design.sync(d, "led", LED_SPEC, None)
+    before = (tmp_path / "led.kicad_sch").read_text()
+    wrong_fp = {"ref": "R1", "symbol": "Amplifier_Operational:LM358",
+                "footprint": "Resistor_SMD:R_0805_2012Metric", "pins": {"1": "+5V"}}
+    with pytest.raises(ToolError, match=r"pin/pad mismatch.*R1: pins \['3'"):
+        design.sync(d, "led", None, {"parts": [wrong_fp]})
+    assert (tmp_path / "led.kicad_sch").read_text() == before
+
+
 def test_multi_unit_power_flags_and_nc(tmp_path):
     spec = {"board": {"width_mm": 30, "height_mm": 20}, "parts": [
         {"ref": "J1", "symbol": "Connector_Generic:Conn_01x03",

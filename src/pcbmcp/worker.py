@@ -582,18 +582,13 @@ def cmd_sync_pcb(a: dict) -> dict:
         if p.get("lcsc"):
             _set_field(fp, "LCSC", p["lcsc"])
 
-        pad_nums = set()
+        # pin<->pad uyumu design.sync'te dosya yazılmadan önce kontrol edilir (check_pin_pad)
         for pad in fp.Pads():
-            num = pad.GetNumber()
-            pad_nums.add(num)
-            net = p["pads"].get(num)
+            net = p["pads"].get(pad.GetNumber())
             if net:
                 pad.SetNet(nets[net])
             else:
                 pad.SetNetCode(0)
-        missing = sorted(set(p["pads"]) - pad_nums)
-        if missing:
-            warnings.append(f"{ref}: symbol pins {missing} have no pad in {p['footprint']}")
 
     bk = None if created else backup(path)
     pcbnew.SaveBoard(path, b)

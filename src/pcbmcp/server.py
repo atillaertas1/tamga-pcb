@@ -60,10 +60,12 @@ def find_symbol(query: str, limit: int = 10) -> dict:
 @tool
 def get_symbol(lib_id: str, footprint: str = "") -> dict:
     """Pins of a symbol as 'number:name:type' (+unit). Call before using a symbol in a spec.
-    If footprint given, also lists its pad numbers so you can check they match."""
+    If footprint given, also lists its pad numbers and a pin<->pad check
+    (missing_pads = error, unused_pads = pad left unconnected)."""
     out = library.describe_symbol(lib_id)
     if footprint:
         out["footprint_pads"] = " ".join(library.footprint_pads(footprint))
+        out["pad_check"] = library.check_pin_pad(lib_id, footprint)
     return out
 
 
