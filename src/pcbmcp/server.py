@@ -283,6 +283,10 @@ def import_board(input_path: str, fmt: str = "auto", out_path: str = "") -> dict
 
 
 def main() -> None:
+    import sys
+    if sys.argv[1:2] == ["doctor"]:
+        from . import doctor
+        sys.exit(doctor.main(sys.argv[2:]))
     mcp.run()
 
 

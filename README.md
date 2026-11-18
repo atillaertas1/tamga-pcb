@@ -40,10 +40,8 @@ Neden böyle:
 ```bash
 cd ~/Documents/Personal/pcb-deneme
 uv sync
-# Freerouting (bir kez): https://github.com/freerouting/freerouting/releases
-curl -L -o tools/freerouting.jar \
-  https://github.com/freerouting/freerouting/releases/download/v2.5.0/freerouting-2.5.0.jar
-uv run pytest -q          # 24 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
+uv run pcbmcp doctor --fix   # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir (v2.5.0, Java 25+)
+uv run pytest -q          # 42 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
 ```
 Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
 Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.

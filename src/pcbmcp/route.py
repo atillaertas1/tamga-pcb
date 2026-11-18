@@ -27,7 +27,7 @@ def jar_path() -> Path:
         raise KicadError(
             f"Freerouting jar not found at {p}. Download freerouting-<ver>.jar from "
             "https://github.com/freerouting/freerouting/releases to tools/freerouting.jar "
-            "or set FREEROUTING_JAR."
+            "or set FREEROUTING_JAR, or run `pcbmcp doctor --fix`."
         )
     return p
 
