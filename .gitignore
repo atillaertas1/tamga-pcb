@@ -10,3 +10,4 @@ tools/*.jar
 *-backups/
 fp-info-cache
 ~*.lck
+projects/
