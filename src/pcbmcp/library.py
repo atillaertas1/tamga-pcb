@@ -21,6 +21,13 @@ from . import sexpr
 from .sexpr import Sym, child, children, value
 
 SYM_DIR = Path(os.environ.get("PCBMCP_SYMBOL_DIR", "/usr/share/kicad/symbols"))
+# Projeye özel semboller (ör. 100 pinli B2B konnektör): repo/symbols + PCBMCP_EXTRA_SYMBOL_DIRS.
+SYM_DIRS = [SYM_DIR, Path(__file__).resolve().parents[2] / "symbols",
+            *(Path(p) for p in os.environ.get("PCBMCP_EXTRA_SYMBOL_DIRS", "").split(os.pathsep) if p)]
+
+
+def _sym_files() -> list[Path]:
+    return [p for d in SYM_DIRS if d.is_dir() for p in sorted(d.glob("*.kicad_sym"))]
 FP_DIR = Path(os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints"))
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "pcbmcp"
 
@@ -47,12 +54,12 @@ def _index_lib(path: Path) -> list[list[str]]:
 def symbol_index() -> dict[str, list[list[str]]]:
     CACHE.mkdir(parents=True, exist_ok=True)
     cache_file = CACHE / "symbol_index.json"
-    stamp = {p.name: p.stat().st_mtime for p in sorted(SYM_DIR.glob("*.kicad_sym"))}
+    stamp = {str(p): p.stat().st_mtime for p in _sym_files()}
     if cache_file.is_file():
         data = json.loads(cache_file.read_text())
         if data.get("stamp") == stamp:
             return data["libs"]
-    libs = {p.stem: _index_lib(p) for p in sorted(SYM_DIR.glob("*.kicad_sym"))}
+    libs = {p.stem: _index_lib(p) for p in _sym_files()}
     cache_file.write_text(json.dumps({"stamp": stamp, "libs": libs}))
     return libs
 
@@ -113,10 +120,11 @@ def footprint_file(fid: str) -> Path:
 
 @lru_cache(maxsize=64)
 def _lib_tree(lib: str):
-    p = SYM_DIR / f"{lib}.kicad_sym"
-    if not p.is_file():
-        raise ToolError(f"symbol library '{lib}' not found")
-    return sexpr.parse(p.read_text(encoding="utf-8"))
+    for d in SYM_DIRS:
+        p = d / f"{lib}.kicad_sym"
+        if p.is_file():
+            return sexpr.parse(p.read_text(encoding="utf-8"))
+    raise ToolError(f"symbol library '{lib}' not found")
 
 
 def _raw_symbol(lib: str, name: str):
