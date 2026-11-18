@@ -49,6 +49,8 @@ bir sonraki `sync_design`'da ezilir, değişikliği spec'e yap.
 5. Kritik netler (izolasyon bariyeri yakını, kısa tutulması gereken güç yolu, hassas analog):
    önce `route_net(net, 'U1.3', 'C5.1', points)` ile elle yönlendir (kilitli kalır). Sonra
    `autoroute` → `add_copper_zone` (varsayılan: GND, iki katman + 5 mm stitching via) → `run_drc`.
+   `autoroute` kartın kendisine yazar (yedekli). Kartı başka adla kopyalayıp DRC koşma: KiCad kuralları
+   aynı adlı `.kicad_pro`/`.kicad_dru`'dan okur. `run_drc` `rules_warning` verirse sonuç geçersizdir.
 6. DRC `CLEAN` olana kadar: en çok sayıdaki ihlal türünden başla, `examples` konumlarını kullan.
 7. `export_fab` → `missing_lcsc` boş olmalı; kalan varsa kullanıcıya listele.
 

@@ -70,7 +70,10 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
               on_progress: Callable[[str, int], None] | None = None) -> dict:
     """on_progress(message, routing_pass) her geçişte çağrılır (MCP progress bildirimi için)."""
     jar = jar_path()
-    out = out or str(Path(pcb).with_name(Path(pcb).stem + "_routed.kicad_pcb"))
+    # Varsayılan: kartın kendisine yaz (import_ses yedek alır). Ayrı bir <ad>_routed.kicad_pcb
+    # yazmak tehlikeliydi: KiCad kuralları AYNI ADLI .kicad_pro/.kicad_dru'dan okur, o dosyada DRC
+    # varsayılan kurallarla koşup netclass'ları ve özel kuralları (ör. izolasyon) sessizce atlıyordu.
+    out = out or pcb
     work = Path(tempfile.mkdtemp(prefix="pcbmcp-route-"))
     dsn, ses = work / "board.dsn", work / "board.ses"
     try:

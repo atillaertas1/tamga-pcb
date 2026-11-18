@@ -196,8 +196,8 @@ def route_net(pcb_path: str, net: str, from_pad: str, to_pad: str,
 def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
               ignore_netclasses: list[str] | None = None, timeout_s: int = 900,
               ctx: Context = None) -> dict:
-    """Autoroute with Freerouting (headless). Writes <name>_routed.kicad_pcb unless out_path
-    given. Reports unrouted before/after. Route critical nets by hand first, then run this.
+    """Autoroute with Freerouting (headless). Writes the board in place (backup kept) unless
+    out_path given; a board under another name loses the project's rules (see run_drc). Reports unrouted before/after. Route critical nets by hand first, then run this.
     Sends progress per pass; on timeout reports the pass reached (nothing is written)."""
     on_progress = None
     if ctx is not None:
@@ -216,10 +216,29 @@ def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
 def run_drc(pcb_path: str, refill_zones: bool = True, schematic_parity: bool = False,
             max_examples: int = 3) -> dict:
     """DRC grouped by violation type: count, affected nets, a few example locations.
-    'verdict: CLEAN' when nothing found."""
+    'verdict: CLEAN' when nothing found. If the board has no same-named .kicad_pro, project
+    netclasses and .kicad_dru rules are NOT applied: rules_warning, and CLEAN is downgraded."""
     with tempfile.TemporaryDirectory() as d:
         rep = drc_json(abspath(pcb_path), f"{d}/drc.json", refill_zones, schematic_parity)
-    return report.summarize(rep, max_examples)
+    out = report.summarize(rep, max_examples)
+    if warn := _rules_warning(Path(abspath(pcb_path))):
+        out["rules_warning"] = warn
+        if out.get("verdict") == "CLEAN" and "project file here" in warn:
+            out["verdict"] = "CLEAN_WITHOUT_PROJECT_RULES"
+    return out
+
+
+def _rules_warning(pcb: Path) -> str | None:
+    """KiCad kuralları kartla AYNI ADLI .kicad_pro / .kicad_dru'dan okur. Kopya/yeniden
+    adlandırılmış kartta DRC varsayılan kurallarla koşar ve özel kuralları sessizce atlar."""
+    if pcb.with_suffix(".kicad_pro").is_file():
+        return None
+    msg = f"no {pcb.with_suffix('.kicad_pro').name} next to the board: DRC used DEFAULT rules"
+    if others := sorted(p.name for p in pcb.parent.glob("*.kicad_pro")):
+        msg += f"; project file here is {others[0]}: run DRC on that board name"
+    if drus := sorted(p.name for p in pcb.parent.glob("*.kicad_dru")):
+        msg += f"; custom rules in {drus[0]} were skipped"
+    return msg
 
 
 @tool

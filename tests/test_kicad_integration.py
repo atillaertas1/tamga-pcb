@@ -148,3 +148,26 @@ def test_autoroute_keeps_hand_routes(board, monkeypatch):
     r = server.autoroute(board, max_passes=20)
     assert r["unrouted_after"] == 0 and _locked(r["out"]) == before
     assert server.run_drc(r["out"], refill_zones=False).get("verdict") == "CLEAN"
+
+
+def test_drc_warns_when_project_rules_are_missing(board):
+    """Kopya adlı kartta KiCad .kicad_pro/.kicad_dru'yu bulamaz -> varsayılan kurallar (eski
+    autoroute <ad>_routed.kicad_pcb tuzağı: izolasyon kuralı gibi özel kurallar atlanıyordu)."""
+    pcb = Path(board)
+    assert pcb.with_suffix(".kicad_pro").is_file()
+    assert "rules_warning" not in server.run_drc(board, refill_zones=False)
+    (pcb.parent / "ldo.kicad_dru").write_text("(version 1)\n")
+    copy = pcb.with_name("ldo_routed.kicad_pcb")
+    shutil.copy(pcb, copy)
+    w = server.run_drc(str(copy), refill_zones=False)["rules_warning"]
+    assert "DEFAULT rules" in w and "ldo.kicad_pro" in w and "ldo.kicad_dru were skipped" in w
+
+
+@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file()
+                    or shutil.which("java") is None, reason="freerouting.jar/java missing")
+def test_autoroute_writes_in_place_with_backup(board, monkeypatch):
+    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    r = server.autoroute(board, max_passes=20)
+    assert r["out"] == board and r["unrouted_after"] == 0
+    assert list((Path(board).parent / ".pcbmcp_backups").glob("*ldo.kicad_pcb"))
+    assert not list(Path(board).parent.glob("*_routed.kicad_pcb"))
