@@ -180,3 +180,22 @@ def test_in_bom_follows_footprint_attrs(tmp_path):
     for ref, want in (("H1", "no"), ("R1", "no"), ("D1", "yes")):
         block = sch[:sch.index(f'(property "Reference" "{ref}"')]
         assert block[block.rindex("(in_bom"):].startswith(f"(in_bom {want})"), ref
+
+
+def test_sheets_power_symbols_and_notes(tmp_path):
+    """Parça 'sheet' alanı -> ayrı sayfa; GND/+5V güç sembolü (etiket değil); sayfa notu; net adları aynı."""
+    spec = json.loads(json.dumps(LED_SPEC))
+    spec["parts"][0]["sheet"] = "Giriş"
+    for p in spec["parts"][1:]:
+        p["sheet"] = "LED Bölümü"
+    spec["sheet_notes"] = {"LED Bölümü": "R = (5 - 2) / 9 mA = 330R"}
+    r = design.sync(str(tmp_path), "led", spec, None)
+    assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
+    assert r["nets"] == "+5V:2 GND:2 LED_A:2"  # net adları değişmedi
+    assert {f.name for f in tmp_path.glob("*.kicad_sch")} == {"led.kicad_sch", "led-Giris.kicad_sch", "led-LED_Bolumu.kicad_sch"}
+    page = (tmp_path / "led-LED_Bolumu.kicad_sch").read_text()
+    assert '(lib_id "power:GND")' in page and '(lib_id "power:+5V")' in page
+    assert '(global_label "GND"' not in page and '(global_label "LED_A"' in page  # sinyal neti etiket kalır
+    assert "330R" in page  # not sayfada
+    root = (tmp_path / "led.kicad_sch").read_text()
+    assert '"Sheetname" "LED Bölümü"' in root and "[güç] +5V GND" in root  # kök: sayfalar arası arayüz

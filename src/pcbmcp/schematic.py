@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 
@@ -53,6 +54,30 @@ def _font(hide: bool = False, justify: str | None = None) -> list:
 def _prop(name: str, val: str, x: float, y: float, hide: bool, angle: float = 0,
           justify: str | None = None) -> list:
     return [Sym("property"), name, val, [Sym("at"), x, y, angle], _font(hide, justify)]
+
+
+_POWER_RE = re.compile(r"^(GND|\+|V(IN|CC|DD|ISO|BAT|BUS))")
+_POWER_LIB = {"+5V", "+3V3", "+1V8", "+12V", "+24V", "+3V0", "+2V5", "+1V2", "+1V0", "+15V"}
+
+
+def power_net_set(spec: dict, nets: set[str]) -> set[str]:
+    """Etiket yerine güç sembolüyle çizilecek netler. spec['power_nets'] verilirse o, yoksa ad deseni
+    (GND*, +*, VIN*, VCC*, VDD*, VISO*). Net adı sembolün Value'sundan gelir: ad değişmez."""
+    if spec.get("power_nets") is not None:
+        return set(spec["power_nets"]) & nets
+    return {n for n in nets if _POWER_RE.match(n)}
+
+
+def _power_lib_id(net: str) -> str:
+    if net.startswith("GND"):
+        return "power:GND"
+    return f"power:{net}" if net in _POWER_LIB else "power:VCC"
+
+
+def _rot_xy(px: float, py: float, angle: float) -> tuple[float, float]:
+    """Sembol koordinatını (Y yukarı) CCW döndür."""
+    a = math.radians(angle)
+    return px * math.cos(a) - py * math.sin(a), px * math.sin(a) + py * math.cos(a)
 
 
 def normalize(spec: dict) -> dict:
@@ -112,6 +137,9 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
         for (num, unit, x, y), net in pmap.items():
             t = next(p["type"] for p in pins if (p["number"], p["unit"], p["x"], p["y"]) == (num, unit, x, y))
             net_types.setdefault(net, set()).add(t)
+    power_nets = power_net_set(spec, set(net_types))
+    for n in power_nets:  # güç sembolünün pini power_in: sürücüsü yoksa PWR_FLAG gerekir
+        net_types[n].add("power_in")
     flag_nets = sorted(n for n, ts in net_types.items() if "power_in" in ts and "power_out" not in ts)
     if flag_nets:
         flag_sym = library.resolve_symbol("power:PWR_FLAG")
@@ -128,10 +156,13 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
     # PCB ve .kicad_dru kuralları aynı kalır. Hiyerarşi görsel düzen içindir.
     groups: dict[str | None, list] = {None: []}
     for entry in resolved:
-        groups.setdefault(entry[0].get("instance"), []).append(entry)
+        groups.setdefault(entry[0].get("instance") or entry[0].get("sheet"), []).append(entry)
     sheets = [g for g in groups if g is not None]
 
-    def page(entries, inst_path, sheet_path, sheetname, sheetfile, extra_area=0.0):
+    pwr_count = [0]
+    notes_of = spec.get("sheet_notes") or {}
+
+    def page(entries, inst_path, sheet_path, sheetname, sheetfile, extra_area=0.0, notes=""):
         """Bir sayfanın sembollerini diz; (items, kullanılan lib_id'ler, kağıt) döndür."""
         items: list = []
         used: dict[str, list] = {}
@@ -143,13 +174,42 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
                 pts = library.body_points(sym, unit)
                 xs = [p[0] for p in pts]
                 ys = [-p[1] for p in pts]  # sembol Y yukarı -> şematik Y aşağı
-                longest = max((len(n) for (num, u, *_), n in pmap.items() if u in (0, unit)), default=0)
-                margin = STUB + 2 + longest * 1.1
-                boxes.append((part, sym, pins, pmap, unit,
-                              min(xs) - margin, max(xs) + margin, min(ys) - 4, max(ys) + 4))
-        total_area = sum((b[6] - b[5]) * (b[8] - b[7]) for b in boxes) + extra_area
-        paper = next((p for p in PAPERS if total_area * 2.2 < p[1] * p[2]), PAPERS[-1])
-        cur_x, cur_y, row_h = 25.4, 30.48, 0.0
+                # Her kenarın payı o kenardaki pinlerin uzantısına göre: etiket (uzunluğuyla) ya da güç
+                # sembolü (~6.5 mm). Sabit pay, alt/üst pinlerdeki sembollerin üst üste binmesine yol açıyordu.
+                side = {"l": 2.54, "r": 2.54, "t": 4.0, "b": 4.0}  # ref/değer yazısı için asgari
+                for pn in pins:
+                    if pn["unit"] not in (0, unit):
+                        continue
+                    net = pmap.get((pn["number"], pn["unit"], pn["x"], pn["y"]))
+                    ext = STUB + (6.5 if net in power_nets else 2 + len(net) * 1.1) if net else 1.5
+                    a_ = math.radians(pn["angle"])
+                    dx_, dy_ = -round(math.cos(a_)), round(math.sin(a_))
+                    k = {(-1, 0): "l", (1, 0): "r", (0, -1): "t", (0, 1): "b"}[(dx_, dy_)]
+                    side[k] = max(side[k], ext)
+                boxes.append((part, sym, pins, pmap, unit, min(xs) - side["l"], max(xs) + side["r"],
+                              min(ys) - side["t"], max(ys) + side["b"]))
+        note_lines = notes.splitlines() if notes else []
+        note_h = (len(note_lines) * 2.1 + 5.08) if note_lines else 0.0
+        total_area = sum((b[6] - b[5]) * (b[8] - b[7]) for b in boxes) + extra_area + note_h * 200
+        start_y = snap(30.48 + note_h)
+
+        def fits(pp):  # yerleşimi kuru çalıştır: alt kenar başlık bloğuna/çerçeveye taşmasın
+            cx, cy, rh = 25.4, start_y, 0.0
+            for bx_ in boxes:
+                w_, h_ = bx_[6] - bx_[5], bx_[8] - bx_[7]
+                if cx + w_ > pp[1] - 20 and cx > 25.4:
+                    cx, cy, rh = 25.4, cy + rh + 5.08, 0.0
+                cx += w_ + 5.08
+                rh = max(rh, h_)
+            return cy + rh <= pp[2] - 45
+
+        first = next((i for i, pp in enumerate(PAPERS) if total_area * 2.2 < pp[1] * pp[2]), len(PAPERS) - 1)
+        paper = next((pp for pp in PAPERS[first:] if fits(pp)), PAPERS[-1])
+        cur_x, cur_y, row_h = 25.4, start_y, 0.0
+        if note_lines:  # tasarım notları (hesaplar, gerekçeler) sayfanın başına
+            items.append([Sym("text"), "\n".join(note_lines), [Sym("exclude_from_sim"), Sym("no")],
+                          [Sym("at"), 25.4, 25.4, 0], _font(False, "left top"),
+                          [Sym("uuid"), uid(project, "notes", sheetname)]])
         for part, sym, pins, pmap, unit, x0, x1, y0, y1 in boxes:
             w, h = x1 - x0, y1 - y0
             if cur_x + w > paper[1] - 20 and cur_x > 25.4:
@@ -213,6 +273,32 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
                 items.append([Sym("wire"), [Sym("pts"), [Sym("xy"), px, py], [Sym("xy"), ex, ey]],
                               [Sym("stroke"), [Sym("width"), 0], [Sym("type"), Sym("default")]],
                               [Sym("uuid"), uid(project, *key, "wire")]])
+                # PWR_FLAG'in ucu etiket kalır: yalnız güç sembollerinden oluşan alt-ağı KiCad ERC
+                # "pin not connected" sayıyor. Aynı adlı global etiket güç netine bağlanır.
+                if net in power_nets and not virtual:
+                    lib_id = _power_lib_id(net)
+                    psym = library.resolve_symbol(lib_id)
+                    used[lib_id] = psym
+                    ground = lib_id == "power:GND"
+                    # sembol gövdesi pinden dışarı baksın (toprak varsayılan aşağı, besleme yukarı; CCW)
+                    rot = ({(0, 1): 0, (1, 0): 90, (0, -1): 180, (-1, 0): 270} if ground else
+                           {(0, -1): 0, (-1, 0): 90, (0, 1): 180, (1, 0): 270})[(dx, dy)]
+                    pwr_count[0] += 1
+                    pref = f"#PWR{pwr_count[0]:03d}"
+                    vprop = next((q for q in children(psym, "property") if q[1] == "Value"), None)
+                    vat = child(vprop, "at") if vprop else None
+                    vx, vy = _rot_xy(float(vat[1]), float(vat[2]), rot) if vat else (0.0, 0.0)
+                    pu = uid(project, *key, "pwr")
+                    items.append([Sym("symbol"), [Sym("lib_id"), lib_id], [Sym("at"), ex, ey, rot], [Sym("unit"), 1],
+                                  [Sym("exclude_from_sim"), Sym("no")], [Sym("in_bom"), Sym("no")],
+                                  [Sym("on_board"), Sym("no")], [Sym("dnp"), Sym("no")], [Sym("uuid"), pu],
+                                  _prop("Reference", pref, ex, ey, True),
+                                  _prop("Value", net, snap(ex + vx, 0.01), snap(ey - vy, 0.01), False),
+                                  _prop("Footprint", "", ex, ey, True), _prop("Datasheet", "", ex, ey, True),
+                                  [Sym("pin"), "1", [Sym("uuid"), uid(project, *key, "pwr", "pin")]],
+                                  [Sym("instances"), [Sym("project"), project,
+                                   [Sym("path"), inst_path, [Sym("reference"), pref], [Sym("unit"), 1]]]]])
+                    continue
                 angle = {(1, 0): 0, (-1, 0): 180, (0, -1): 90, (0, 1): 270}[(dx, dy)]
                 just = "left" if angle in (0, 90) else "right"
                 items.append([Sym("global_label"), net, [Sym("shape"), Sym("passive")],
@@ -242,8 +328,10 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
     sheet_boxes = []
     for i, name in enumerate(sheets, 2):
         suid = uid(project, "sheet", name)
-        fname = f"{project}-{re.sub(r'[^A-Za-z0-9_.-]', '_', name)}.kicad_sch"
-        items, used, paper, _ = page(groups[name], f"/{root}/{suid}", f"/{suid}", f"/{name}/", fname)
+        ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()  # İzoleli -> Izoleli
+        fname = f"{project}-{re.sub(r'[^A-Za-z0-9_.-]', '_', ascii_name)}.kicad_sch"
+        items, used, paper, _ = page(groups[name], f"/{root}/{suid}", f"/{suid}", f"/{name}/", fname,
+                                     notes=notes_of.get(name, ""))
         sub = [Sym("kicad_sch"), [Sym("version"), 20250114], [Sym("generator"), "pcbmcp"],
                [Sym("generator_version"), "0.2"], [Sym("uuid"), uid(project, "page", name)],
                [Sym("paper"), paper[0]], [Sym("title_block"), [Sym("title"), name]],
@@ -253,7 +341,17 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
 
     # kök sayfa: kalan parçalar + her instance için sheet kutusu (portlar kutu içinde yazı)
     # blocks.expand her instance'ın port eşlemesini "sheets"e yazar: ["TX = UART5_TX", ...]
-    ports_of = {name: spec.get("sheets", {}).get(name, {}).get("ports", []) for name in sheets}
+    nets_on = {g: {n for (_p, _s, _pins, pm) in groups[g] for n in pm.values()} for g in groups}
+    ports_of = {}
+    for name in sheets:
+        if name in spec.get("sheets", {}):  # blok instance'ı: port = net eşlemesi
+            ports_of[name] = spec["sheets"][name].get("ports", [])
+            continue
+        others = set().union(*(nets_on[g] for g in groups if g != name))
+        shared = sorted(nets_on[name] & others)
+        sig = [n for n in shared if n not in power_nets]
+        pwr = [n for n in shared if n in power_nets]
+        ports_of[name] = sig + ([f"[güç] {' '.join(pwr)}"] if pwr else [])
     box_area = sum(40 * (10 + 2.54 * len(ports_of[n])) for n in sheets)
     items, used, paper, bottom = page(groups[None], f"/{root}", "", "/", f"{project}.kicad_sch", box_area)
     bx, by, row_h = 25.4, snap(bottom + 10.16), 0.0

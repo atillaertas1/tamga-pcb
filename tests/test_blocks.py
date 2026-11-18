@@ -98,8 +98,8 @@ def test_sync_with_blocks(tmp_path):
     r = design.sync(str(tmp_path), "blk", None, {"remove_instances": ["STAT"]})
     assert not (tmp_path / "blk-STAT.kicad_sch").exists() and sorted(r["pcb"]["removed"]) == ["D201", "R201"]
     assert r["parity"] == "OK"
-    # +3V3 artık sadece J1'e gidiyor: ERC bunu doğru yakalar (gerçek tasarım uyarısı, hata değil)
-    assert [t["type"] for t in r["erc"]["types"]] == ["isolated_pin_label"]
+    # +3V3 artık sadece J1'e gidiyor; güç sembolüyle çizildiği için (global net) etiket uyarısı yok
+    assert r["erc"] == "CLEAN"
 
 
 def test_null_port_leaves_pin_unconnected():
