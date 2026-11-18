@@ -439,10 +439,7 @@ def cmd_set_netclass(a: dict) -> dict:
 FP_DIR = os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints")
 
 
-def _new_board(path: str, w: float, h: float):
-    """Boş kart: Edge.Cuts dikdörtgeni (100,100)'den başlar + JLCPCB standart kuralları."""
-    b = pcbnew.NewBoard(path)
-    x0, y0 = 100.0, 100.0
+def _edge_rect(b, x0: float, y0: float, w: float, h: float) -> None:
     corners = [(x0, y0), (x0 + w, y0), (x0 + w, y0 + h), (x0, y0 + h)]
     for (ax, ay), (bx, by) in zip(corners, corners[1:] + corners[:1]):
         s = pcbnew.PCB_SHAPE(b)
@@ -452,6 +449,30 @@ def _new_board(path: str, w: float, h: float):
         s.SetLayer(pcbnew.Edge_Cuts)
         s.SetWidth(pcbnew.FromMM(0.1))
         b.Add(s)
+
+
+def _resize_board(b, w: float, h: float) -> str | None:
+    """Kenar 4 düz segmentten oluşan dikdörtgense sol-üst köşeyi koruyup boyutu değiştir.
+    Başka şekilli kenarlara dokunmaz (None döner)."""
+    edges = [d for d in b.GetDrawings() if d.GetLayer() == pcbnew.Edge_Cuts]
+    bb = b.GetBoardEdgesBoundingBox()
+    cur_w, cur_h = round(mm(bb.GetWidth()), 2), round(mm(bb.GetHeight()), 2)
+    if abs(cur_w - w) < 0.2 and abs(cur_h - h) < 0.2:  # çizgi kalınlığı payı
+        return None
+    if len(edges) != 4 or any(d.GetShape() != pcbnew.SHAPE_T_SEGMENT for d in edges):
+        return "board outline is not a simple rectangle; resize skipped"
+    x0 = mm(bb.GetLeft()) + 0.05
+    y0 = mm(bb.GetTop()) + 0.05
+    for d in edges:
+        b.Remove(d)
+    _edge_rect(b, x0, y0, w, h)
+    return f"board resized {cur_w:.1f}x{cur_h:.1f} -> {w:.1f}x{h:.1f} mm"
+
+
+def _new_board(path: str, w: float, h: float):
+    """Boş kart: Edge.Cuts dikdörtgeni (100,100)'den başlar + JLCPCB standart kuralları."""
+    b = pcbnew.NewBoard(path)
+    _edge_rect(b, 100.0, 100.0, w, h)
     ds = b.GetDesignSettings()
     ds.m_TrackMinWidth = pcbnew.FromMM(0.127)
     ds.m_MinClearance = pcbnew.FromMM(0.127)
@@ -487,10 +508,13 @@ def cmd_sync_pcb(a: dict) -> dict:
     """
     path = a["pcb"]
     created = not os.path.isfile(path)
+    resized = None
     if created:
         b = _new_board(path, float(a["board"].get("width_mm", 50)), float(a["board"].get("height_mm", 40)))
     else:
         b = load(path)
+        resized = _resize_board(b, float(a["board"].get("width_mm", 50)),
+                                float(a["board"].get("height_mm", 40))) if a.get("board") else None
 
     nets = {}
     for p in a["parts"]:
@@ -507,6 +531,10 @@ def cmd_sync_pcb(a: dict) -> dict:
     existing = {fp.GetReference(): fp for fp in b.GetFootprints()}
 
     for ref, fp in existing.items():
+        # "Not in schematic" (board-only) footprint'ler (logo, fiducial, montaj işareti)
+        # şematikten gelmez; senkronizasyon onlara dokunmaz.
+        if fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
+            continue
         if ref not in want:
             b.Remove(fp)
             removed.append(ref)
@@ -571,6 +599,8 @@ def cmd_sync_pcb(a: dict) -> dict:
     pcbnew.SaveBoard(path, b)
     out = {"pcb": path, "created": created, "added": added, "updated": len(updated),
            "replaced": replaced, "removed": removed, "unrouted": unrouted(b)}
+    if resized:
+        out["resized"] = resized
     if bk:
         out["backup"] = bk
     if warnings:
