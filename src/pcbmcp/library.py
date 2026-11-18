@@ -271,6 +271,16 @@ def footprint_pads(fid: str) -> list[str]:
     return sorted({str(p[1]) for p in children(tree, "pad") if str(p[1])}, key=_natural)
 
 
+def footprint_attrs(fid: str) -> set[str]:
+    """(attr smd exclude_from_bom ...) -> {'smd', 'exclude_from_bom'}; footprint yoksa boş."""
+    try:
+        tree = sexpr.parse(footprint_file(fid).read_text(encoding="utf-8"))
+    except ToolError:
+        return set()
+    attr = child(tree, "attr")
+    return {str(a) for a in attr[1:]} if attr else set()
+
+
 def pad_positions(fid: str) -> dict[str, tuple[float, float]]:
     """{pad_no: (x, y)} mm, footprint koordinatında. Aynı numaralı çoklu pad'de (EP) ilki."""
     tree = sexpr.parse(footprint_file(fid).read_text(encoding="utf-8"))

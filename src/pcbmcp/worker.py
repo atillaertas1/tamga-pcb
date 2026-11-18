@@ -589,6 +589,7 @@ def cmd_sync_pcb(a: dict) -> dict:
         fp.SetSheetname(p.get("sheetname") or "/")
         fp.SetSheetfile(p.get("sheetfile") or a["sheetfile"])
         fp.SetDNP(bool(p.get("dnp")))
+        fp.SetExcludedFromBOM(not p.get("in_bom", True))  # sembolle aynı (parity)
         if p.get("lcsc"):
             _set_field(fp, "LCSC", p["lcsc"])
 

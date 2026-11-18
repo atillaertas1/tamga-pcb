@@ -41,7 +41,7 @@ Neden böyle:
 cd ~/Documents/Personal/pcb-deneme
 uv sync
 uv run pcbmcp doctor --fix   # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir (v2.5.0, Java 25+)
-uv run pytest -q          # 58 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
+uv run pytest -q          # 59 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
 ```
 Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
 Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.

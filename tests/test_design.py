@@ -166,3 +166,17 @@ def test_full_flow_to_fab(tmp_path, monkeypatch):
     assert server.run_drc(pcb, schematic_parity=True).get("verdict") == "CLEAN"
     fab = server.export_fab(pcb)
     assert fab["missing_lcsc"] and "R1" not in fab["missing_lcsc"]
+
+
+def test_in_bom_follows_footprint_attrs(tmp_path):
+    """Montaj deliği footprint'i exclude_from_bom: sembol de hariç olmalı, yoksa parity uyarısı."""
+    spec = json.loads(json.dumps(LED_SPEC))
+    spec["parts"].append({"ref": "H1", "symbol": "Mechanical:MountingHole_Pad",
+                          "footprint": "MountingHole:MountingHole_2.7mm_M2.5_Pad", "pins": {"1": "GND"}})
+    spec["parts"][1]["in_bom"] = False  # elle de hariç tutulabilir
+    r = design.sync(str(tmp_path), "led", spec, None)
+    assert r["parity"] == "OK" and r["erc"] == "CLEAN"
+    sch = (tmp_path / "led.kicad_sch").read_text()
+    for ref, want in (("H1", "no"), ("R1", "no"), ("D1", "yes")):
+        block = sch[:sch.index(f'(property "Reference" "{ref}"')]
+        assert block[block.rindex("(in_bom"):].startswith(f"(in_bom {want})"), ref

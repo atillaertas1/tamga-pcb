@@ -171,11 +171,15 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
                 return sx + dx, sy + dy, 0
 
             virtual = part.get("_virtual", False)
+            # BOM: footprint 'exclude_from_bom' ise sembol de hariç (montaj deliği, lehim köprüsü);
+            # yoksa KiCad parity 'footprint_symbol_mismatch' verir. Spec'te "in_bom": false da olur.
+            fp_attrs = library.footprint_attrs(part["footprint"]) if part.get("footprint") else set()
+            in_bom = not virtual and part.get("in_bom", True) and "exclude_from_bom" not in fp_attrs
             ref_x, ref_y, ref_a = ppos("Reference")
             val_x, val_y, val_a = ppos("Value")
             inst = [Sym("symbol"), [Sym("lib_id"), part["symbol"]], [Sym("at"), sx, sy, 0],
                     [Sym("unit"), unit], [Sym("exclude_from_sim"), Sym("no")],
-                    [Sym("in_bom"), Sym("no" if virtual else "yes")],
+                    [Sym("in_bom"), Sym("yes" if in_bom else "no")],
                     [Sym("on_board"), Sym("no" if virtual else "yes")],
                     [Sym("dnp"), Sym("yes" if part.get("dnp") else "no")],
                     [Sym("uuid"), u],
@@ -227,7 +231,7 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
                     "sym_uuid": uid(project, part["ref"], 1), "pads": pad_nets,
                     "path": f"{sheet_path}/{uid(project, part['ref'], 1)}",
                     "sheetname": sheetname, "sheetfile": sheetfile,
-                    "dnp": bool(part.get("dnp")),
+                    "dnp": bool(part.get("dnp")), "in_bom": bool(in_bom),
                 }
 
         bottom = cur_y + row_h
