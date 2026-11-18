@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -22,6 +23,31 @@ def _paths(project_dir: str, name: str) -> dict[str, Path]:
     d.mkdir(parents=True, exist_ok=True)
     return {"dir": d, "spec": d / f"{name}.circuit.json", "sch": d / f"{name}.kicad_sch",
             "pcb": d / f"{name}.kicad_pcb"}
+
+
+def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
+    """Stok olmayan kütüphaneleri (pcbmcp_custom, pcbmcp_lcsc...) projenin sym-lib-table /
+    fp-lib-table'ına ${KIPRJMOD}'a göreli ekle. Var olan kayıtlara dokunmaz. -> eklenenler"""
+    added = []
+    for kind, table, key in (("sym", "sym-lib-table", "symbol"), ("fp", "fp-lib-table", "footprint")):
+        libs = sorted({p[key].split(":", 1)[0] for p in spec["parts"] if ":" in p.get(key, "")})
+        need = {lib: path for lib in libs if (path := library.extra_lib_path(kind, lib))}
+        if not need:
+            continue
+        f = d / table
+        S = sexpr.Sym
+        tree = sexpr.parse(f.read_text()) if f.is_file() else \
+            [S(table.replace("-", "_")), [S("version"), 7]]
+        have = {str(sexpr.value(e, "name")) for e in sexpr.children(tree, "lib")}
+        for lib, path in need.items():
+            if lib in have:
+                continue
+            uri = "${KIPRJMOD}/" + os.path.relpath(path, d)
+            tree.append([S("lib"), [S("name"), lib], [S("type"), "KiCad"], [S("uri"), uri],
+                         [S("options"), ""], [S("descr"), "pcbmcp"]])
+            added.append(f"{table}:{lib}")
+        f.write_text(sexpr.dump(tree) + "\n")
+    return added
 
 
 def load_spec(project_dir: str, name: str) -> dict | None:
@@ -113,6 +139,7 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
 
     paths["spec"].write_text(json.dumps(spec, indent=1, ensure_ascii=False) + "\n")
     paths["sch"].write_text(text)
+    libs_added = ensure_lib_tables(paths["dir"], spec)
 
     with tempfile.TemporaryDirectory() as tmp:
         nets = _netlist(paths["sch"], tmp)
@@ -154,6 +181,8 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
         out["no_footprint"] = missing_fp
     if pad_warnings:
         out["pad_warnings"] = pad_warnings
+    if libs_added:
+        out["lib_tables_added"] = libs_added
     if pinout_warnings:
         out["pinout_warnings"] = pinout_warnings
     if pinout_unchecked:

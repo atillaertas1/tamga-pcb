@@ -29,6 +29,9 @@ SYM_DIRS = [SYM_DIR, Path(__file__).resolve().parents[2] / "symbols",
 def _sym_files() -> list[Path]:
     return [p for d in SYM_DIRS if d.is_dir() for p in sorted(d.glob("*.kicad_sym"))]
 FP_DIR = Path(os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints"))
+# İçe aktarılan / projeye özel footprint'ler: repo/footprints + PCBMCP_EXTRA_FOOTPRINT_DIRS.
+FP_DIRS = [FP_DIR, Path(__file__).resolve().parents[2] / "footprints",
+           *(Path(p) for p in os.environ.get("PCBMCP_EXTRA_FOOTPRINT_DIRS", "").split(os.pathsep) if p)]
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "pcbmcp"
 
 _TOP_SYM = re.compile(r'^\t\(symbol "([^"]+)"', re.M)
@@ -86,7 +89,8 @@ def find_symbols(query: str, limit: int = 10) -> list[str]:
 
 @lru_cache(maxsize=1)
 def footprint_index() -> list[str]:
-    return sorted(f"{d.stem}:{f.stem}" for d in FP_DIR.glob("*.pretty") for f in d.glob("*.kicad_mod"))
+    return sorted(f"{d.stem}:{f.stem}" for root in FP_DIRS for d in root.glob("*.pretty")
+                  for f in d.glob("*.kicad_mod"))
 
 
 def find_footprints(query: str, pattern: str = "", limit: int = 15) -> list[str]:
@@ -108,12 +112,26 @@ def find_footprints(query: str, pattern: str = "", limit: int = 15) -> list[str]
     return out[:limit]
 
 
+def extra_lib_path(kind: str, lib: str) -> Path | None:
+    """Stok KiCad DIŞINDAKİ kütüphanenin yolu (kind 'sym' | 'fp'); stoksa/yoksa None.
+    Proje lib-table'ına eklenmesi gerekenleri bulmak için."""
+    if kind == "sym":
+        cands = [d / f"{lib}.kicad_sym" for d in SYM_DIRS[1:]]
+    else:
+        cands = [d / f"{lib}.pretty" for d in FP_DIRS[1:]]
+    stock = (SYM_DIR / f"{lib}.kicad_sym") if kind == "sym" else (FP_DIR / f"{lib}.pretty")
+    if stock.exists():
+        return None
+    return next((p for p in cands if p.exists()), None)
+
+
 def footprint_file(fid: str) -> Path:
     lib, name = fid.split(":", 1)
-    p = FP_DIR / f"{lib}.pretty" / f"{name}.kicad_mod"
-    if not p.is_file():
-        raise ToolError(f"footprint {fid} not found; use find_footprint")
-    return p
+    for root in FP_DIRS:
+        p = root / f"{lib}.pretty" / f"{name}.kicad_mod"
+        if p.is_file():
+            return p
+    raise ToolError(f"footprint {fid} not found; use find_footprint")
 
 
 # ------------------------------------------------------------------ sembol çözümleme

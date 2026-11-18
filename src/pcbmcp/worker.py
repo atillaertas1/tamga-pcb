@@ -436,7 +436,9 @@ def cmd_set_netclass(a: dict) -> dict:
     return out
 
 
-FP_DIR = os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints")
+FP_DIRS = [os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints"),
+           os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "footprints"),
+           *(p for p in os.environ.get("PCBMCP_EXTRA_FOOTPRINT_DIRS", "").split(os.pathsep) if p)]
 
 
 def _edge_rect(b, x0: float, y0: float, w: float, h: float) -> None:
@@ -484,7 +486,11 @@ def _new_board(path: str, w: float, h: float):
 
 def _load_fp(fid: str):
     lib, name = fid.split(":", 1)
-    fp = pcbnew.FootprintLoad(f"{FP_DIR}/{lib}.pretty", name)
+    fp = None
+    for root in FP_DIRS:  # library.FP_DIRS ile aynı sıra (stok KiCad önce)
+        if os.path.isfile(f"{root}/{lib}.pretty/{name}.kicad_mod"):
+            fp = pcbnew.FootprintLoad(f"{root}/{lib}.pretty", name)
+            break
     if fp is None:
         raise KeyError(f"footprint {fid} not found")
     fp.SetFPID(pcbnew.LIB_ID(lib, name))
