@@ -98,6 +98,11 @@ def sync_design(project_dir: str, name: str, spec: dict | None = None,
     spec: {title?, board:{width_mm,height_mm}, parts:[{ref, symbol:'Lib:Name',
       footprint:'Lib:Name', value?, lcsc?, dnp?, pins:{pin_number_or_name: net}, nc?:[pins]|'*'}]}
     patch (instead of spec, for edits): {parts:[partial parts merged by ref], remove:[refs]}.
+    Blocks (reusable subcircuits): spec.blocks {name:{ports:[..], parts:[..]}} + spec.instances
+      [{block, name, nets?:{port:net|null}, set?:{local_ref:{value,lcsc,..}}, refs?:{local:ref},
+      ref_base?, net_prefix?}]. Unmapped port = same-named global net; other nets become
+      <net_prefix><net> (default '<name>_'). patch: instances (merge by name), blocks, remove_instances.
+      Renaming nets can silently disable .kicad_dru rules: watch nets_gone / dru_rules_reference_gone_nets.
     Unlisted pins stay unconnected (ERC flags them) unless in nc. PWR_FLAGs are added
     automatically. Checks: netlist vs spec, ERC, schematic<->PCB parity."""
     if spec is None and patch is None:

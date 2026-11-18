@@ -41,7 +41,7 @@ Neden böyle:
 cd ~/Documents/Personal/pcb-deneme
 uv sync
 uv run pcbmcp doctor --fix   # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir (v2.5.0, Java 25+)
-uv run pytest -q          # 42 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
+uv run pytest -q          # 54 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
 ```
 Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
 Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.
@@ -86,6 +86,14 @@ KiCad'de olmayan parça: `import_lcsc_part("C597931")` → `symbols/pcbmcp_lcsc.
 `footprints/pcbmcp_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
 footprint'i varsa pad numaralandırması karşılaştırılır (ör. Hirose DF40'ta EasyEDA U-numaralı,
 KiCad tek/çift → 100/100 pad farklı; uyarı verir).
+
+**Devre blokları** (tekrar eden alt devreler): `blocks` bir kez tanımlanır, `instances` ile kullanılır.
+Port eşlenmezse aynı adlı global nete bağlanır; diğer netler `<net_prefix><net>` olur (varsayılan
+`<ad>_`). Ref'ler `ref_base` (U1→U101) ya da `refs` ile sabit — bloğa parça eklemek diğer instance'ların
+ref'lerini, dolayısıyla PCB yerleşimini kaydırmaz. Mevcut tasarımı bloklara taşırken `refs` + `net_prefix`
+ile eski ref ve net adları korunur: cm3-carrier'daki iki MAX3232 bloklaştırıldığında netlist, PCB ve DRC
+birebir aynı kaldı. Net adı değişirse `nets_gone` raporlanır; `.kicad_dru`'da o ada bakan kural varsa
+`dru_rules_reference_gone_nets` uyarır (bağlantı doğru olsa da kural sessizce devre dışı kalır).
 
 Sınırlar: tek sayfa (hiyerarşik sheet yok); şematik okunur ama "label stili" (tel çizimi yok);
 `.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.

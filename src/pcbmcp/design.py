@@ -6,15 +6,17 @@
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
+import re
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import library, pinout, report, schematic, sexpr
+from . import blocks, library, pinout, report, schematic, sexpr
 from .kicad import abspath, cli, drc_json, erc_json, run_worker
 
 
@@ -50,14 +52,43 @@ def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
     return added
 
 
+def _dru_mentions(d: Path, nets: list[str]) -> list[str]:
+    """Projedeki .kicad_dru dosyalarında bu net adlarına uyan tırnaklı desenler ('IC?P' gibi)."""
+    hits = []
+    for f in d.glob("*.kicad_dru"):
+        pats = set(re.findall(r"NetName\s*==\s*'([^']+)'", f.read_text()))
+        for n in nets:
+            if m := [pt for pt in pats if fnmatch.fnmatchcase(n, pt)]:
+                hits.append(f"{n} ~ {m[0]} ({f.name})")
+    return hits
+
+
 def load_spec(project_dir: str, name: str) -> dict | None:
     p = _paths(project_dir, name)["spec"]
     return json.loads(p.read_text()) if p.is_file() else None
 
 
 def apply_patch(spec: dict, patch: dict) -> dict:
-    """patch: {parts:[...] (ref'e göre ekle/değiştir, alanları birleştir), remove:[ref], board:{...}, title}"""
+    """patch: {parts:[...] (ref'e göre ekle/değiştir, alanları birleştir), remove:[ref], board:{...}, title,
+    blocks:{name: def|null} (değiştir/sil), instances:[...] (name'e göre ekle/birleştir; nets/set/refs
+    alan alan birleşir), remove_instances:[name]}"""
     spec = json.loads(json.dumps(spec))
+    spec.setdefault("parts", [])
+    for bname, bdef in (patch.get("blocks") or {}).items():
+        if bdef is None:
+            spec.get("blocks", {}).pop(bname, None)
+        else:
+            spec.setdefault("blocks", {})[bname] = bdef
+    insts = {i["name"]: i for i in spec.get("instances", [])}
+    for inst in patch.get("instances", []):
+        old = insts.get(inst["name"])
+        if old is None:
+            spec.setdefault("instances", []).append(inst)
+            continue
+        for k, v in inst.items():
+            old[k] = {**old.get(k, {}), **v} if k in ("nets", "set", "refs") else v
+    if rm_i := set(patch.get("remove_instances", [])):
+        spec["instances"] = [i for i in spec.get("instances", []) if i["name"] not in rm_i]
     by_ref = {p["ref"]: p for p in spec["parts"]}
     for p in patch.get("parts", []):
         if p["ref"] in by_ref:
@@ -96,6 +127,8 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
             raise ToolError(f"no {paths['spec'].name}; pass a full spec first")
     if patch:
         spec = apply_patch(spec, patch)
+    source = spec  # diske bloklu hali yazılır; geri kalan her şey açılmış (düz) parçalarla çalışır
+    spec = blocks.expand(source)
 
     text, meta = schematic.build(spec, name)
     if meta["errors"]:
@@ -137,7 +170,7 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
                     issues.append(f"symbol-only pins {res['symbol_only']}")
                 pinout_warnings.append(f"{p['ref']} ({p['lcsc']} {res['part']}): " + "; ".join(issues))
 
-    paths["spec"].write_text(json.dumps(spec, indent=1, ensure_ascii=False) + "\n")
+    paths["spec"].write_text(json.dumps(source, indent=1, ensure_ascii=False) + "\n")
     paths["sch"].write_text(text)
     libs_added = ensure_lib_tables(paths["dir"], spec)
 
@@ -169,6 +202,7 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
     out = {
         "files": {k: str(v) for k, v in paths.items() if k != "dir"},
         "parts": len(meta["parts"]),
+        **({"instances": blocks.summary(source, spec)} if source.get("instances") else {}),
         "nets": " ".join(f"{n}:{len(v)}" for n, v in sorted(nets.items()) if not n.startswith("unconnected-")),
         "netlist_check": "OK" if not mismatch else mismatch[:20],
         "erc": erc if erc.get("verdict") != "CLEAN" else "CLEAN",
@@ -183,6 +217,13 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
         out["pad_warnings"] = pad_warnings
     if libs_added:
         out["lib_tables_added"] = libs_added
+    if gone := pcb.get("nets_gone"):
+        # İz/döküm taşıyan net pad'siz kaldı: ad değişti ya da silindi. Bağlantı doğru olabilir ama
+        # .kicad_dru kuralları ve netclass desenleri net ADINA bakar -> sessizce devre dışı kalır.
+        hits = _dru_mentions(paths["dir"], gone)
+        out["nets_gone"] = gone[:20]
+        if hits:
+            out["dru_rules_reference_gone_nets"] = hits
     if pinout_warnings:
         out["pinout_warnings"] = pinout_warnings
     if pinout_unchecked:

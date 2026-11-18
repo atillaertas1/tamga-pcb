@@ -522,6 +522,9 @@ def cmd_sync_pcb(a: dict) -> dict:
         resized = _resize_board(b, float(a["board"].get("width_mm", 50)),
                                 float(a["board"].get("height_mm", 40))) if a.get("board") else None
 
+    # Bakır taşıyan netler (iz/via/döküm): senkron sonrası pad'siz kalırsa ad değişmiş/silinmiş demek
+    copper_nets = {t.GetNetname() for t in b.GetTracks()} | {z.GetNetname() for z in b.Zones()}
+
     nets = {}
     for p in a["parts"]:
         for net in p["pads"].values():
@@ -602,6 +605,9 @@ def cmd_sync_pcb(a: dict) -> dict:
            "replaced": replaced, "removed": removed, "unrouted": unrouted(b)}
     if resized:
         out["resized"] = resized
+    pad_nets = {pad.GetNetname() for f in b.GetFootprints() for pad in f.Pads()}
+    if gone := sorted(n for n in copper_nets - pad_nets if n):
+        out["nets_gone"] = gone
     if bk:
         out["backup"] = bk
     if warnings:
