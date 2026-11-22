@@ -10,6 +10,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -27,9 +28,22 @@ def _paths(project_dir: str, name: str) -> dict[str, Path]:
             "pcb": d / f"{name}.kicad_pcb"}
 
 
+LOCAL_LIBS = "lib"  # stok olmayan kütüphanelerin proje içi kopyası: proje tek başına taşınabilir
+
+
+def _copy_lib(src: Path, dst: Path) -> None:
+    """Kütüphaneyi (dosya ya da .pretty dizini) projeye kopyala; yalnız eksik/yeni dosyalar."""
+    files = [(f, dst / f.name) for f in src.iterdir() if f.is_file()] if src.is_dir() else [(src, dst)]
+    for a, b in files:
+        if not b.exists() or a.stat().st_mtime > b.stat().st_mtime:
+            b.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(a, b)
+
+
 def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
-    """Stok olmayan kütüphaneleri (pcbmcp_custom, pcbmcp_lcsc...) projenin sym-lib-table /
-    fp-lib-table'ına ${KIPRJMOD}'a göreli ekle. Var olan kayıtlara dokunmaz. -> eklenenler"""
+    """Stok olmayan kütüphaneleri (pcbmcp_custom, pcbmcp_lcsc...) projenin lib/ klasörüne kopyala ve
+    sym-lib-table / fp-lib-table'a ${KIPRJMOD}/lib/... olarak ekle. Kullanıcının kendi kayıtlarına
+    dokunmaz; pcbmcp'nin eski kayıtlarını (descr 'pcbmcp...') yeni yola taşır. -> eklenen/taşınanlar"""
     added = []
     for kind, table, key in (("sym", "sym-lib-table", "symbol"), ("fp", "fp-lib-table", "footprint")):
         libs = sorted({p[key].split(":", 1)[0] for p in spec["parts"] if ":" in p.get(key, "")})
@@ -40,15 +54,22 @@ def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
         S = sexpr.Sym
         tree = sexpr.parse(f.read_text()) if f.is_file() else \
             [S(table.replace("-", "_")), [S("version"), 7]]
-        have = {str(sexpr.value(e, "name")) for e in sexpr.children(tree, "lib")}
+        have = {str(sexpr.value(e, "name")): e for e in sexpr.children(tree, "lib")}
+        changed = False
         for lib, path in need.items():
-            if lib in have:
+            _copy_lib(path, d / LOCAL_LIBS / path.name)
+            uri = "${KIPRJMOD}/" + LOCAL_LIBS + "/" + path.name
+            if (e := have.get(lib)) is None:
+                tree.append([S("lib"), [S("name"), lib], [S("type"), "KiCad"], [S("uri"), uri],
+                             [S("options"), ""], [S("descr"), "pcbmcp"]])
+            elif str(sexpr.value(e, "descr") or "").startswith("pcbmcp") and sexpr.value(e, "uri") != uri:
+                sexpr.child(e, "uri")[1] = uri
+            else:
                 continue
-            uri = "${KIPRJMOD}/" + os.path.relpath(path, d)
-            tree.append([S("lib"), [S("name"), lib], [S("type"), "KiCad"], [S("uri"), uri],
-                         [S("options"), ""], [S("descr"), "pcbmcp"]])
+            changed = True
             added.append(f"{table}:{lib}")
-        f.write_text(sexpr.dump(tree) + "\n")
+        if changed:
+            f.write_text(sexpr.dump(tree) + "\n")
     return added
 
 

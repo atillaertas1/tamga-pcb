@@ -57,7 +57,9 @@ def test_imported_part_in_design_adds_lib_tables(imp, tmp_path, monkeypatch):
     r = design.sync(str(proj), "t", spec, None)
     assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
     assert r["lib_tables_added"] == ["sym-lib-table:pcbmcp_lcsc", "fp-lib-table:pcbmcp_lcsc"]
-    assert "${KIPRJMOD}/../lib/symbols/pcbmcp_lcsc.kicad_sym" in (proj / "sym-lib-table").read_text()
+    assert "${KIPRJMOD}/lib/pcbmcp_lcsc.kicad_sym" in (proj / "sym-lib-table").read_text()
+    assert "${KIPRJMOD}/lib/pcbmcp_lcsc.pretty" in (proj / "fp-lib-table").read_text()
+    assert (proj / "lib" / "pcbmcp_lcsc.kicad_sym").is_file()  # proje tek başına taşınabilir
     assert "Q1" in r["pcb"]["added"]
     assert "lib_tables_added" not in design.sync(str(proj), "t", None, {"parts": []})
 
