@@ -39,6 +39,24 @@ araçlar tek satırlık özetlerle cevap verir.
   60 x 32 mm'yi geçmesin, JLCPCB'ye hazır olsun.
 ```
 
+## Örnekler
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="examples/ch340-usb-uart"><img src="assets/examples/ch340-3d.png" alt="CH340C USB-C UART adaptörü" /></a></td>
+    <td width="50%" align="center"><a href="examples/esp32c3-devboard"><img src="assets/examples/esp32c3-3d.png" alt="ESP32-C3 USB-C geliştirme kartı" /></a></td>
+  </tr>
+  <tr>
+    <td><b><a href="examples/ch340-usb-uart">CH340C USB-C → UART adaptörü</a></b><br/><sub>Claude Code <b>tek prompt</b>tan,
+    kimse karışmadan yaptı: 35 × 20 mm, DRC temiz, üretim dosyaları hazır. Sonnet 5.5 ile <b>3 dk, 48 araç çağrısı, ~0,51 $</b>,
+    ölçülmüş. <a href="examples/ch340-usb-uart/SESSION.md">Oturum raporu</a></sub></td>
+    <td><b><a href="examples/esp32c3-devboard">ESP32-C3 USB-C geliştirme kartı</a></b><br/><sub>60 × 32 mm, 19 parça,
+    reset/boot, yerel USB. Aynı araçlarla bir script baştan sona üretir; yukarıdaki görsellerin kaynağı.</sub></td>
+  </tr>
+</table>
+
+Token, maliyet, süre ve ilk denemenin öğrettikleri: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
 ## Kurulum
 
 Claude Code içinde:

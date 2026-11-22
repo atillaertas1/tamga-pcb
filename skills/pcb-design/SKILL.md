@@ -58,6 +58,8 @@ are overwritten by the next `sync_design`, so change the spec instead.
    DRC on it: KiCad reads the rules from the `.kicad_pro`/`.kicad_dru` with the same name. If `run_drc`
    returns `rules_warning`, the result is not valid.
 6. Until DRC is `CLEAN`: start with the most frequent violation type and use the `examples` locations.
+   Freerouting is not deterministic: if the only errors are `copper_edge_clearance` or `track_width` on
+   autorouted tracks, run `autoroute` again, then `add_copper_zone` and `run_drc`.
 7. `export_fab` → `missing_lcsc` should be empty; list any leftovers to the user.
 
 ## Setup problems

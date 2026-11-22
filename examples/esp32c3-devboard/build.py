@@ -96,12 +96,17 @@ def main() -> int:
     step("set_netclass", s.set_netclass(str(PCB), "POWER", ["VBUS", "+3V3"], track_mm=0.5,
                                         via_mm=0.8, via_drill_mm=0.4), ("netclass",))
     step("set_netclass", s.set_netclass(str(PCB), "GND", ["GND"], track_mm=0.4), ("netclass",))
-    step("autoroute", s.autoroute(str(PCB), max_passes=100, ignore_netclasses=["GND"]),
-         ("unrouted_before", "unrouted_after", "tracks", "vias"))
-    copper_view()
-    step("add_copper_zone", s.add_copper_zone(str(PCB)), ("zone", "stitch_vias", "unrouted"))
-    drc = step("run_drc", s.run_drc(str(PCB), schematic_parity=True))
-    if drc.get("verdict") != "CLEAN":
+    # Freerouting is not deterministic; now and then it leaves a track a hair inside the edge clearance.
+    # Like the skill tells the agent: route again (autoroute rips up the old tracks first), at most 3 times.
+    for attempt in range(1, 4):
+        step(f"autoroute #{attempt}", s.autoroute(str(PCB), max_passes=100, ignore_netclasses=["GND"]),
+             ("unrouted_before", "unrouted_after", "tracks", "vias", "ripped_up"))
+        copper_view()
+        step("add_copper_zone", s.add_copper_zone(str(PCB)), ("zone", "stitch_vias", "unrouted"))
+        drc = step("run_drc", s.run_drc(str(PCB), schematic_parity=True))
+        if drc.get("verdict") == "CLEAN":
+            break
+    else:
         return 1
     step("export_fab", s.export_fab(str(PCB)), ("zip", "missing_lcsc"))
     images()

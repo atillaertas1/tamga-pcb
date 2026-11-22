@@ -109,6 +109,8 @@ def report(m: dict, prompt: str, title: str, appended: str = "") -> str:
     t = m["tokens"]
     total_in = t["input"] + t["cache_write"] + t["cache_read"]
     peak = max((c["context_tokens"] for c in m["per_call"]), default=0)
+    pc = m["per_call"]
+    growth = round((pc[-1]["context_tokens"] - pc[0]["context_tokens"]) / max(1, len(pc) - 1) / 1000, 1) if pc else 0
     tools = list(m["tools"].items())
     xs = ", ".join(str(c["call"]) for c in m["per_call"])
     ys = ", ".join(str(round(c["context_tokens"] / 1000, 1)) for c in m["per_call"])
@@ -133,8 +135,11 @@ def report(m: dict, prompt: str, title: str, appended: str = "") -> str:
         f"| API cost (list price) | ${m['cost_usd']:.2f} |" if m.get("cost_usd") is not None else "| API cost | n/a |",
         "",
         "## Context per API call", "",
-        "How much the model had in front of it at each step (thousand tokens). It stays flat because tools",
-        "answer with one-line summaries instead of KiCad files.", "",
+        f"How much the model had in front of it at each step, in thousand tokens. It starts at "
+        f"{round(m['per_call'][0]['context_tokens'] / 1000, 1) if m['per_call'] else 0}k (system prompt, tools, skill) "
+        f"and grows by about {growth}k per call, because tools answer with one-line summaries instead of KiCad files. "
+        "Each call re-reads the whole context, which is why the total above runs into millions; "
+        "almost all of it comes from the prompt cache at a tenth of the price.", "",
         "```mermaid", "xychart-beta", '    title "Context size per API call (k tokens)"',
         f"    x-axis [{xs}]", f'    y-axis "k tokens" 0 --> {max(10, round(peak / 1000) + 5)}', f"    line [{ys}]", "```", "",
         "## Where the tokens went", "",

@@ -1,0 +1,201 @@
+{
+ "model": "claude-sonnet-5-5",
+ "claude_code_version": "2.1.330",
+ "tools_available": 75,
+ "mcp_servers_loaded": 22,
+ "num_turns": 50,
+ "api_calls": 28,
+ "tool_calls": 48,
+ "tool_errors": 0,
+ "tools": {
+  "search_parts": 11,
+  "add_copper_zone": 5,
+  "run_drc": 5,
+  "get_symbol": 4,
+  "autoroute": 4,
+  "get_footprint": 3,
+  "find_symbol": 2,
+  "find_footprint": 2,
+  "place_footprints": 2,
+  "render_board": 2,
+  "Read": 2,
+  "Skill": 1,
+  "ToolSearch": 1,
+  "sync_design": 1,
+  "board_summary": 1,
+  "set_netclass": 1,
+  "export_fab": 1
+ },
+ "tool_result_chars": {
+  "search_parts": 2990,
+  "get_symbol": 2346,
+  "get_footprint": 2194,
+  "run_drc": 1837,
+  "sync_design": 1391,
+  "board_summary": 1215,
+  "autoroute": 1205,
+  "add_copper_zone": 1016,
+  "find_footprint": 872,
+  "find_symbol": 576,
+  "place_footprints": 406,
+  "export_fab": 325,
+  "render_board": 195,
+  "set_netclass": 180,
+  "Skill": 37,
+  "ToolSearch": 0,
+  "Read": 0
+ },
+ "tokens": {
+  "input": 56,
+  "cache_write": 50439,
+  "cache_read": 1451145,
+  "output": 16637
+ },
+ "cost_usd": 0.5133525000000001,
+ "duration_s": 186,
+ "api_duration_s": 147,
+ "is_error": false,
+ "final_message": "CH340C USB-C to UART board is done: DRC is clean (0 errors, 0 warnings, schematic parity on), nothing is unrouted, and the fab files are exported. I did not check the CPL rotations or the LED polarity in JLC's viewer, so do both before ordering.\n\n**What's on the board**\n- It's 35.1 \u00d7 20.1 mm, two layers. USB-C sits on the left edge and the 6-pin header on the right, in the order GND, CTS, VCC, TXD, RXD, DTR.\n- The header's TXD is the CH340's TXD, like an FTDI cable. The header's VCC is the 5 V from USB.\n- 5 V and GND use 0.4 mm tracks. GND is poured on both layers with stitching vias.\n\n**Choices I made without asking**\n- The USB-C connector is C165948 (TYPE-C-31-M-12, 16-pin).\n- Both LEDs are red (C2286, basic). The green one I found (C72043) is an extended part, so I avoided it.\n- Each LED has a 1 k resistor from 5 V to its anode and the cathode on TXD or RXD. They light when the line goes low.\n- The CH340C needs no crystal. It gets 100 nF on VCC, 100 nF on V3, and a 10 \u00b5F cap on 5 V. Two 5.1 k resistors on CC1 and CC2 make it a plain USB 2.0 device.\n- The header is the vertical through-hole type, since a vertical header is the usual FTDI-style choice. JLC won't place it, so you solder it by hand, and it's the one BOM line with no LCSC code.\n- To get the GND pour past DRC I set its clearance to 0.2 mm and the stitching pitch to 2.5 mm. This comes after a starved-thermal error on a USB shield pad and unconnected pour islands.\n\n**Worth checking before ordering**\n- **LED polarity:** the LCSC part's pin 1 and 2 are listed the opposite way round to the KiCad LED symbol. The footprint and CPL rotation decide the real orientation, so check D1 and D2 in JLC's 3D/CPL viewer, and check the other rotations there too.\n- **Extended parts:** CH340C (C84681) and the USB-C connector (C165948) are both extended parts. Each adds a $3 setup fee at JLC.\n- **Unrouted CC/D\u00b1 pairs:** D+/D\u2212 were autorouted, not length-matched. That's fine for full-speed USB at this size.\n\n**Files** are in `ch340-usb-uart/ch340/`. `ch340.circuit.json` is the editable source and `ch340.kicad_pcb` is the board. `fab/` has `ch340-gerbers.zip`, `BOM.csv` and `CPL.csv`.",
+ "per_call": [
+  {
+   "call": 1,
+   "context_tokens": 26328,
+   "output_tokens": 4
+  },
+  {
+   "call": 2,
+   "context_tokens": 35710,
+   "output_tokens": 44
+  },
+  {
+   "call": 3,
+   "context_tokens": 36974,
+   "output_tokens": 9
+  },
+  {
+   "call": 4,
+   "context_tokens": 40843,
+   "output_tokens": 3
+  },
+  {
+   "call": 5,
+   "context_tokens": 42906,
+   "output_tokens": 7
+  },
+  {
+   "call": 6,
+   "context_tokens": 46896,
+   "output_tokens": 4
+  },
+  {
+   "call": 7,
+   "context_tokens": 48824,
+   "output_tokens": 4
+  },
+  {
+   "call": 8,
+   "context_tokens": 49854,
+   "output_tokens": 40
+  },
+  {
+   "call": 9,
+   "context_tokens": 51206,
+   "output_tokens": 5
+  },
+  {
+   "call": 10,
+   "context_tokens": 54392,
+   "output_tokens": 4
+  },
+  {
+   "call": 11,
+   "context_tokens": 54741,
+   "output_tokens": 39
+  },
+  {
+   "call": 12,
+   "context_tokens": 55037,
+   "output_tokens": 64
+  },
+  {
+   "call": 13,
+   "context_tokens": 55404,
+   "output_tokens": 3
+  },
+  {
+   "call": 14,
+   "context_tokens": 55696,
+   "output_tokens": 16
+  },
+  {
+   "call": 15,
+   "context_tokens": 56705,
+   "output_tokens": 7
+  },
+  {
+   "call": 16,
+   "context_tokens": 57250,
+   "output_tokens": 40
+  },
+  {
+   "call": 17,
+   "context_tokens": 57828,
+   "output_tokens": 8
+  },
+  {
+   "call": 18,
+   "context_tokens": 58582,
+   "output_tokens": 8
+  },
+  {
+   "call": 19,
+   "context_tokens": 58971,
+   "output_tokens": 39
+  },
+  {
+   "call": 20,
+   "context_tokens": 59373,
+   "output_tokens": 3
+  },
+  {
+   "call": 21,
+   "context_tokens": 59850,
+   "output_tokens": 8
+  },
+  {
+   "call": 22,
+   "context_tokens": 60194,
+   "output_tokens": 9
+  },
+  {
+   "call": 23,
+   "context_tokens": 60877,
+   "output_tokens": 16
+  },
+  {
+   "call": 24,
+   "context_tokens": 61911,
+   "output_tokens": 4
+  },
+  {
+   "call": 25,
+   "context_tokens": 63282,
+   "output_tokens": 8
+  },
+  {
+   "call": 26,
+   "context_tokens": 63710,
+   "output_tokens": 43
+  },
+  {
+   "call": 27,
+   "context_tokens": 63951,
+   "output_tokens": 10
+  },
+  {
+   "call": 28,
+   "context_tokens": 64345,
+   "output_tokens": 845
+  }
+ ]
+}

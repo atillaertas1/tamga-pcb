@@ -194,6 +194,23 @@ def _stitch(b, net, pitch_mm: float, via_mm: float = 0.6, drill_mm: float = 0.3)
             return False
         return all(any(p.Contains(pcbnew.VECTOR2I(x + dx, y + dy)) for p in polys) for dx, dy in ring)
 
+    placed = [t.GetPosition() for t in b.GetTracks()
+              if t.GetClass() == "PCB_VIA" and t.GetNetCode() == net.GetNetCode()]
+
+    def add_via(x, y):
+        v = pcbnew.PCB_VIA(b)
+        v.SetViaType(pcbnew.VIATYPE_THROUGH)
+        v.SetPosition(pcbnew.VECTOR2I(x, y))
+        v.SetWidth(pcbnew.FromMM(via_mm))
+        v.SetDrill(pcbnew.FromMM(drill_mm))
+        v.SetNet(net)
+        v.SetIsFree(True)
+        b.Add(v)
+        placed.append(pcbnew.VECTOR2I(x, y))
+
+    def ok(x, y):
+        return inside(by_layer[pcbnew.F_Cu], x, y) and inside(by_layer[pcbnew.B_Cu], x, y)
+
     bb = b.GetBoardEdgesBoundingBox()
     step, inset = pcbnew.FromMM(pitch_mm), pcbnew.FromMM(1.5)
     n = 0
@@ -201,18 +218,34 @@ def _stitch(b, net, pitch_mm: float, via_mm: float = 0.6, drill_mm: float = 0.3)
     while y <= bb.GetBottom() - inset:
         x = bb.GetLeft() + inset
         while x <= bb.GetRight() - inset:
-            if inside(by_layer[pcbnew.F_Cu], x, y) and inside(by_layer[pcbnew.B_Cu], x, y):
-                v = pcbnew.PCB_VIA(b)
-                v.SetViaType(pcbnew.VIATYPE_THROUGH)
-                v.SetPosition(pcbnew.VECTOR2I(x, y))
-                v.SetWidth(pcbnew.FromMM(via_mm))
-                v.SetDrill(pcbnew.FromMM(drill_mm))
-                v.SetNet(net)
-                v.SetIsFree(True)
-                b.Add(v)
+            if ok(x, y):
+                add_via(x, y)
                 n += 1
             x += step
         y += step
+
+    # İkinci geçiş: ızgaraya düşmeyen dolgu adacıkları (izlerin ayırdığı küçük parçalar) diğer katmana
+    # bağlanmazsa DRC 'unconnected_items Zone <-> Zone' verir. Her via'sız parçaya, ince ızgarada
+    # iki katmanda da dolu ilk noktaya bir via.
+    fine = pcbnew.FromMM(0.5)
+    for lyr in (pcbnew.F_Cu, pcbnew.B_Cu):
+        for polys in by_layer[lyr]:
+            for i in range(polys.OutlineCount()):
+                chain = polys.COutline(i)
+                if any(chain.PointInside(v) for v in placed):
+                    continue
+                box = chain.BBox()
+                y, done = box.GetTop(), False
+                while y <= box.GetBottom() and not done:
+                    x = box.GetLeft()
+                    while x <= box.GetRight():
+                        if chain.PointInside(pcbnew.VECTOR2I(x, y)) and ok(x, y):
+                            add_via(x, y)
+                            n += 1
+                            done = True
+                            break
+                        x += fine
+                    y += fine
     return n
 
 
@@ -309,11 +342,12 @@ def cmd_export_dsn(a: dict) -> dict:
     return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um), "ripped_up": ripped}
 
 
-def _widen_boundary(dsn_path: str, edge_um: float, margin_um: float = 20) -> float:
+def _widen_boundary(dsn_path: str, edge_um: float, margin_um: float = 100) -> float:
     """KiCad kart sınırını 0 genişlikli path olarak yazar; Freerouting sınıra yalnız iz boşluğunu
     (ör. 0.2) uygular, kartın kenar boşluğunu (ör. 0.3) bilmez -> copper_edge_clearance ihlali.
     Sınır çizgisine 2*(kenar - boşluk + pay) genişlik ver: iz merkezden boşluk + yarı genişlik uzak
-    kalır, yani kenardan en az kenar boşluğu + pay. -> verilen genişlik (um)"""
+    kalır, yani kenardan en az kenar boşluğu + pay. Çoğu koşuda yeterli; Freerouting nadiren kalın bir
+    izi yine de kenara yakın bırakıyor (sebebi bilinmiyor): DRC yakalar, autoroute tekrar edilir. -> genişlik (um)"""
     with open(dsn_path, encoding="utf-8") as f:
         text = f.read()
     m = re.search(r"\(rule\s*\(width [\d.]+\)\s*\(clearance ([\d.]+)\)", text)

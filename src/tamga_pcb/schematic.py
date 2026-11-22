@@ -487,10 +487,18 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
                     continue
                 wired.add((p["x"], p["y"], net))
                 d = _outward(p)
-                stub = 3 * STUB if d[1] == 0 and net in power_nets and not virtual else STUB
+                # Yatay güç pini: dik duran sembol okunur, ama komşu pinler (konnektörde 2.54 adım) yakınsa
+                # etiketlerinin üstüne biner; o zaman aynı adlı global etiket (güç netine bağlanır).
+                crowded = any(_outward(q) == d and abs(q["y"] - p["y"]) < 7.6 and (q["x"], q["y"]) != (p["x"], p["y"])
+                              and pmap.get(pkey(q)) for q in unit_pins)
+                upright = d[1] == 0 and net in power_nets and not virtual and not crowded
+                stub = 3 * STUB if upright else STUB
                 e = (round(px + d[0] * stub, 4), round(py + d[1] * stub, 4))
                 cl.wire((px, py), e)
-                if d[1] == 0 and net in power_nets and not virtual:
+                if d[1] == 0 and net in power_nets and not virtual and crowded:
+                    cl.term(net, e, d, False)
+                    continue
+                if upright:
                     # yan yatmış güç sembolünün yazısı dikey okunur: yatay telin ucunda dik dursun
                     cl.term(net, e, (0, 1 if net.startswith("GND") else -1), True)
                     continue

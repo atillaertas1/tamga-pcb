@@ -1,0 +1,177 @@
+{
+ "title": "CH340C USB-C UART adapter",
+ "board": {
+  "width_mm": 35,
+  "height_mm": 20
+ },
+ "parts": [
+  {
+   "ref": "J1",
+   "symbol": "Connector:USB_C_Receptacle_USB2.0_16P",
+   "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+   "value": "USB-C",
+   "lcsc": "C165948",
+   "pins": {
+    "A1": "GND",
+    "A12": "GND",
+    "B1": "GND",
+    "B12": "GND",
+    "SH": "GND",
+    "A4": "+5V",
+    "A9": "+5V",
+    "B4": "+5V",
+    "B9": "+5V",
+    "A5": "CC1",
+    "B5": "CC2",
+    "A6": "USB_DP",
+    "B6": "USB_DP",
+    "A7": "USB_DM",
+    "B7": "USB_DM"
+   },
+   "nc": [
+    "A8",
+    "B8"
+   ]
+  },
+  {
+   "ref": "U1",
+   "symbol": "Interface_USB:CH340C",
+   "footprint": "Package_SO:SOIC-16_3.9x9.9mm_P1.27mm",
+   "value": "CH340C",
+   "lcsc": "C84681",
+   "pins": {
+    "1": "GND",
+    "2": "TXD",
+    "3": "RXD",
+    "4": "V3",
+    "5": "USB_DP",
+    "6": "USB_DM",
+    "9": "CTS",
+    "13": "DTR",
+    "16": "+5V"
+   },
+   "nc": [
+    "7",
+    "8",
+    "10",
+    "11",
+    "12",
+    "14",
+    "15"
+   ]
+  },
+  {
+   "ref": "J2",
+   "symbol": "Connector_Generic:Conn_01x06",
+   "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+   "value": "FTDI",
+   "pins": {
+    "1": "GND",
+    "2": "CTS",
+    "3": "+5V",
+    "4": "TXD",
+    "5": "RXD",
+    "6": "DTR"
+   }
+  },
+  {
+   "ref": "R1",
+   "symbol": "Device:R",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "value": "5.1k",
+   "lcsc": "C23186",
+   "pins": {
+    "1": "CC1",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R2",
+   "symbol": "Device:R",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "value": "5.1k",
+   "lcsc": "C23186",
+   "pins": {
+    "1": "CC2",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R3",
+   "symbol": "Device:R",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "value": "1k",
+   "lcsc": "C21190",
+   "pins": {
+    "1": "+5V",
+    "2": "TX_LED"
+   }
+  },
+  {
+   "ref": "R4",
+   "symbol": "Device:R",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "value": "1k",
+   "lcsc": "C21190",
+   "pins": {
+    "1": "+5V",
+    "2": "RX_LED"
+   }
+  },
+  {
+   "ref": "D1",
+   "symbol": "Device:LED",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "value": "TX",
+   "lcsc": "C2286",
+   "pins": {
+    "1": "TXD",
+    "2": "TX_LED"
+   }
+  },
+  {
+   "ref": "D2",
+   "symbol": "Device:LED",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "value": "RX",
+   "lcsc": "C2286",
+   "pins": {
+    "1": "RXD",
+    "2": "RX_LED"
+   }
+  },
+  {
+   "ref": "C1",
+   "symbol": "Device:C",
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "value": "10uF",
+   "lcsc": "C15850",
+   "pins": {
+    "1": "+5V",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "C2",
+   "symbol": "Device:C",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "value": "100nF",
+   "lcsc": "C14663",
+   "pins": {
+    "1": "+5V",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "C3",
+   "symbol": "Device:C",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "value": "100nF",
+   "lcsc": "C14663",
+   "pins": {
+    "1": "V3",
+    "2": "GND"
+   }
+  }
+ ]
+}

@@ -17,3 +17,7 @@ First public release.
 - **Freerouting is downloaded on first use**; tracks keep the board's edge clearance.
 - **Self-contained projects:** non-stock libraries are copied into `<project>/lib/`.
 - **Example:** an ESP32-C3 USB-C board rebuilt end to end by `examples/esp32c3-devboard/build.py`.
+- **Measured example:** a CH340C USB-UART adapter made by Claude Code from one prompt, with a session report (tokens, cost, tool calls, charts) and [benchmarks](docs/BENCHMARKS.md).
+- **Readable schematics:** small parts are wired to the pin they belong to; series chains are columns.
+- **Reroute safely:** `autoroute` rips up unlocked tracks first; `add_copper_zone` replaces an old pour.
+- **Better part search:** values go to value lookups (`5.1k`, `100nF`), basic parts with unknown stock are kept.

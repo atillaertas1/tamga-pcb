@@ -39,6 +39,24 @@ raw KiCad files: tools answer in one-line summaries, so a whole board fits comfo
   and a GPIO header. Keep it under 60 x 32 mm and get it ready for JLCPCB.
 ```
 
+## Examples
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="examples/ch340-usb-uart"><img src="assets/examples/ch340-3d.png" alt="CH340C USB-C to UART adapter" /></a></td>
+    <td width="50%" align="center"><a href="examples/esp32c3-devboard"><img src="assets/examples/esp32c3-3d.png" alt="ESP32-C3 USB-C dev board" /></a></td>
+  </tr>
+  <tr>
+    <td><b><a href="examples/ch340-usb-uart">CH340C USB-C to UART adapter</a></b><br/><sub>Made by Claude Code from <b>one
+    prompt</b>, unattended: 35 × 20 mm, DRC clean, fab files. <b>3 min, 48 tool calls, about $0.51</b> with Sonnet 5.5,
+    measured. <a href="examples/ch340-usb-uart/SESSION.md">Session report</a></sub></td>
+    <td><b><a href="examples/esp32c3-devboard">ESP32-C3 USB-C dev board</a></b><br/><sub>60 × 32 mm, 19 parts, reset/boot,
+    native USB. Rebuilt end to end by a script through the same tools; the reference for the images above.</sub></td>
+  </tr>
+</table>
+
+Token counts, cost, time and what the first attempt taught us: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
 ## Install
 
 Run this inside Claude Code:
