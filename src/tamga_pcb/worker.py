@@ -65,8 +65,29 @@ def fp_line(fp) -> str:
 
 # ---------------------------------------------------------------- komutlar
 
+def _net_lengths(b, patterns: list[str]) -> dict:
+    """Desene uyan netlerin iz uzunluğu (mm) ve via sayısı; _P/_N, +/-, DP/DN çiftlerinde skew."""
+    import fnmatch
+    names = sorted({t.GetNetname() for t in b.GetTracks() if t.GetNetname()})
+    want = [n for n in names if any(fnmatch.fnmatchcase(n, p) for p in patterns)]
+    out = {}
+    for n in want:
+        length = sum(mm(t.GetLength()) for t in b.GetTracks() if t.GetNetname() == n and t.GetClass() == "PCB_TRACK")
+        vias = sum(1 for t in b.GetTracks() if t.GetNetname() == n and t.GetClass() == "PCB_VIA")
+        out[n] = f"{length:.2f} mm, {vias} vias"
+    pairs = {}
+    for n in want:
+        for p_sfx, n_sfx in (("_P", "_N"), ("+", "-"), ("DP", "DN"), ("D+", "D-")):
+            if n.endswith(p_sfx) and (m := n[: -len(p_sfx)] + n_sfx) in want:
+                lp = float(out[n].split()[0]); ln = float(out[m].split()[0])
+                pairs[f"{n}/{m}"] = f"skew {abs(lp - ln):.2f} mm"
+    return {"lengths": out, **({"pairs": pairs} if pairs else {})}
+
+
 def cmd_summary(a: dict) -> dict:
     b = load(a["pcb"])
+    if a.get("lengths"):
+        return _net_lengths(b, a["lengths"])
     bb = b.GetBoardEdgesBoundingBox()
     fps = list(b.GetFootprints())
     tracks = [t for t in b.GetTracks() if t.GetClass() == "PCB_TRACK"]
@@ -208,7 +229,11 @@ def _stitch(b, net, pitch_mm: float, via_mm: float = 0.6, drill_mm: float = 0.3)
         b.Add(v)
         placed.append(pcbnew.VECTOR2I(x, y))
 
-    def ok(x, y):
+    clear = pcbnew.FromMM(via_mm + 0.3)
+
+    def ok(x, y):  # iki katmanda da dolu ve (tekrar dökümde) mevcut bir via'nın üstü değil
+        if any(abs(v.x - x) < clear and abs(v.y - y) < clear for v in placed):
+            return False
         return inside(by_layer[pcbnew.F_Cu], x, y) and inside(by_layer[pcbnew.B_Cu], x, y)
 
     bb = b.GetBoardEdgesBoundingBox()
@@ -291,7 +316,7 @@ def cmd_add_zone(a: dict) -> dict:
     if not poly:  # tam kart dökümü tekrar çağrılırsa (rotadan sonra) eskisinin yerine geçsin, üst üste binmesin
         for z in list(b.Zones()):
             if (not z.GetIsRuleArea() and z.GetNetname() == a["net"] and z.GetAssignedPriority() == int(a.get("priority", 0))
-                    and z.GetLayerName() in layers):
+                    and b.GetLayerName(z.GetLayer()) in layers):  # z.GetLayerName() hep 'F.Cu' döner
                 b.Delete(z)
                 replaced += 1
     for lname in layers:
@@ -342,7 +367,25 @@ def cmd_export_dsn(a: dict) -> dict:
     ok = pcbnew.ExportSpecctraDSN(b, a["dsn"])
     if not ok:
         raise RuntimeError("ExportSpecctraDSN failed")
-    return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um), "ripped_up": ripped}
+    return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um), "ripped_up": ripped,
+            "plane_keepouts": _plane_keepouts(a["dsn"])}
+
+
+def _plane_keepouts(dsn_path: str) -> int:
+    """'(type power)' katmanlarını Freerouting yine de izle kullanıyor (iç düzlemde VBUS izi, üstüne
+    gelen GND via'ları kısa devre). Bu katmanların tamamına wire_keepout: iz yok, via geçebilir."""
+    with open(dsn_path, encoding="utf-8") as f:
+        text = f.read()
+    planes = re.findall(r"\(layer (\S+)\s*\(type power\)", text)
+    m = re.search(r"\(boundary\s*\(path \S+ [\d.]+\s+([-\d.\s]+)\)", text)
+    if not planes or not m:
+        return 0
+    coords = " ".join(m.group(1).split())
+    ko = "".join(f"    (wire_keepout (polygon {lyr} 0 {coords}))\n" for lyr in planes)
+    text = re.sub(r"(\n\s*\(via )", "\n" + ko.rstrip("\n") + r"\1", text, count=1)
+    with open(dsn_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return len(planes)
 
 
 def _widen_boundary(dsn_path: str, edge_um: float, margin_um: float = 100) -> float:
@@ -465,12 +508,15 @@ def cmd_set_netclass(a: dict) -> dict:
             old = ns.GetNetClassByName(name)
             nc.SetTrackWidth(old.GetTrackWidth()); nc.SetClearance(old.GetClearance())
             nc.SetViaDiameter(old.GetViaDiameter()); nc.SetViaDrill(old.GetViaDrill())
+            if old.HasDiffPairWidth():
+                nc.SetDiffPairWidth(old.GetDiffPairWidth()); nc.SetDiffPairGap(old.GetDiffPairGap())
         else:
             dflt = ns.GetDefaultNetclass()
             nc.SetTrackWidth(dflt.GetTrackWidth()); nc.SetClearance(dflt.GetClearance())
             nc.SetViaDiameter(dflt.GetViaDiameter()); nc.SetViaDrill(dflt.GetViaDrill())
     for key, setter in [("track_mm", nc.SetTrackWidth), ("clearance_mm", nc.SetClearance),
-                        ("via_mm", nc.SetViaDiameter), ("via_drill_mm", nc.SetViaDrill)]:
+                        ("via_mm", nc.SetViaDiameter), ("via_drill_mm", nc.SetViaDrill),
+                        ("dp_width_mm", nc.SetDiffPairWidth), ("dp_gap_mm", nc.SetDiffPairGap)]:
         if a.get(key) is not None:
             setter(pcbnew.FromMM(float(a[key])))
     if name != "Default":
@@ -850,23 +896,19 @@ def _pad(b, spec: str, net: str):
     return on_net
 
 
-def cmd_route_net(a: dict) -> dict:
-    """Elle yönlendirilmiş rota: from_pad -> points -> to_pad. Nokta [x, y] ya da [x, y, layer];
-    katman değişince o noktaya via. İzler KİLİTLİ: sonraki autoroute bunlara dokunmaz."""
-    path = a["pcb"]
-    b = load(path)
-    net = b.FindNet(a["net"])
+def _route_one(b, netname: str, from_pad: str, to_pad: str, points: list, layer: str, width_mm) -> dict:
+    """Tek net: from_pad -> points -> to_pad, kilitli iz; katman değişiminde via."""
+    net = b.FindNet(netname)
     if net is None:
-        raise KeyError(f"net {a['net']} not found")
+        raise KeyError(f"net {netname} not found")
     ns = b.GetDesignSettings().m_NetSettings
-    cls = ns.GetEffectiveNetClass(a["net"])
-    width = pcbnew.FromMM(a["width_mm"]) if a.get("width_mm") else cls.GetTrackWidth()
-    layer = a.get("layer", "F.Cu")
-    starts, ends = _pad(b, a["from_pad"], a["net"]), _pad(b, a["to_pad"], a["net"])
+    cls = ns.GetEffectiveNetClass(netname)
+    width = pcbnew.FromMM(width_mm) if width_mm else cls.GetTrackWidth()
+    starts, ends = _pad(b, from_pad, netname), _pad(b, to_pad, netname)
 
     # nokta listesi: (x, y, katman); katman verilmezse bir öncekinin katmanı
     pts = []
-    for q in a.get("points", []):
+    for q in points:
         layer = q[2] if len(q) > 2 else layer
         pts.append((pcbnew.FromMM(float(q[0])), pcbnew.FromMM(float(q[1])), layer))
     first_layer = pts[0][2] if pts else layer
@@ -884,7 +926,6 @@ def cmd_route_net(a: dict) -> dict:
     last_from = pcbnew.VECTOR2I(*pts[-1][:2]) if pts else sp
     ep = pick(ends, last_layer, last_from).GetPosition()
 
-    before = unrouted(b)
     chain = [(sp.x, sp.y, first_layer), *pts, (ep.x, ep.y, last_layer)]
     segs = vias = 0
     length = 0.0
@@ -911,11 +952,75 @@ def cmd_route_net(a: dict) -> dict:
         b.Add(s)
         segs += 1
         length += mm(int(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5))
+    return {"segments": segs, "vias": vias, "length_mm": round(length, 2), "width_mm": mm(width)}
+
+
+def _offset_path(points: list, d: float) -> list:
+    """Merkez hattını (mm, [x,y,(katman)]) d kadar sola kaydır (köşelerde gönye)."""
+    xy = [(float(q[0]), float(q[1])) for q in points]
+    out = []
+    for i, (x, y) in enumerate(xy):
+        dirs = []
+        if i > 0:
+            dirs.append((x - xy[i - 1][0], y - xy[i - 1][1]))
+        if i < len(xy) - 1:
+            dirs.append((xy[i + 1][0] - x, xy[i + 1][1] - y))
+        nx = ny = 0.0
+        for dx, dy in dirs:
+            ln = (dx * dx + dy * dy) ** 0.5 or 1.0
+            nx, ny = nx - dy / ln, ny + dx / ln
+        ln = (nx * nx + ny * ny) ** 0.5 or 1.0
+        nx, ny = nx / ln, ny / ln
+        miter = 1.0
+        if len(dirs) == 2:  # gönye: iç açının yarısının kosinüsüne böl
+            (ax, ay), (bx, by) = dirs
+            la, lb = (ax * ax + ay * ay) ** 0.5 or 1.0, (bx * bx + by * by) ** 0.5 or 1.0
+            cos_half = max(0.3, (((ax / la) * (bx / lb) + (ay / la) * (by / lb)) + 1) / 2) ** 0.5
+            miter = 1 / cos_half
+        out.append([round(x + nx * d * miter, 4), round(y + ny * d * miter, 4), *points[i][2:]])
+    return out
+
+
+def cmd_route_net(a: dict) -> dict:
+    """Elle yönlendirilmiş rota: from_pad -> points -> to_pad. Nokta [x, y] ya da [x, y, layer];
+    katman değişince o noktaya via. İzler KİLİTLİ: sonraki autoroute bunlara dokunmaz.
+    pair_net verilirse diferansiyel çift: points çiftin merkez hattı, iki iz gap_mm aralıkla."""
+    path = a["pcb"]
+    b = load(path)
+    before = unrouted(b)
+    layer = a.get("layer", "F.Cu")
+    if not a.get("pair_net"):
+        res = _route_one(b, a["net"], a["from_pad"], a["to_pad"], a.get("points", []), layer, a.get("width_mm"))
+    else:
+        cls = b.GetDesignSettings().m_NetSettings.GetEffectiveNetClass(a["net"])
+        width = float(a.get("width_mm") or (mm(cls.GetDiffPairWidth()) if cls.HasDiffPairWidth() else 0)
+                      or mm(cls.GetTrackWidth()))
+        gap = float(a.get("gap_mm") or (mm(cls.GetDiffPairGap()) if cls.HasDiffPairGap() else 0) or 0.2)
+        pts = a.get("points") or []
+        p_start = _pad(b, a["from_pad"], a["net"])[0].GetPosition()
+        n_start = _pad(b, a["pair_from_pad"], a["pair_net"])[0].GetPosition()
+        p_end = _pad(b, a["to_pad"], a["net"])[0].GetPosition()
+        n_end = _pad(b, a["pair_to_pad"], a["pair_net"])[0].GetPosition()
+        mid = lambda u, v: [mm((u.x + v.x) // 2), mm((u.y + v.y) // 2)]  # noqa: E731
+        center = [mid(p_start, n_start) + [layer], *pts, mid(p_end, n_end)]
+        # P izi, başlangıç pad'inin olduğu tarafa. _offset_path'te +d = yön vektörünün (-dy, dx) normali;
+        # P pad'i o normal yönündeyse (iç çarpım > 0) +, değilse -.
+        (cx, cy), (nx_, ny_) = center[0][:2], center[1][:2]
+        dot = -(ny_ - cy) * (mm(p_start.x) - cx) + (nx_ - cx) * (mm(p_start.y) - cy)
+        side = 1 if dot > 0 else -1
+        off = (gap + width) / 2
+        guide_p = _offset_path(center, side * off)[1:-1]
+        guide_n = _offset_path(center, -side * off)[1:-1]
+        rp = _route_one(b, a["net"], a["from_pad"], a["to_pad"], guide_p, layer, width)
+        rn = _route_one(b, a["pair_net"], a["pair_from_pad"], a["pair_to_pad"], guide_n, layer, width)
+        res = {"pair": f"{a['net']}/{a['pair_net']}", "width_mm": round(width, 3), "gap_mm": gap,
+               "length_mm": [rp["length_mm"], rn["length_mm"]],
+               "skew_mm": round(abs(rp["length_mm"] - rn["length_mm"]), 2),
+               "segments": rp["segments"] + rn["segments"], "vias": rp["vias"] + rn["vias"]}
     after = unrouted(b)
     bk = backup(path)
     pcbnew.SaveBoard(path, b)
-    return {"net": a["net"], "segments": segs, "vias": vias, "length_mm": round(length, 2),
-            "width_mm": mm(width), "unrouted_before": before, "unrouted_after": after,
+    return {"net": a["net"], **res, "unrouted_before": before, "unrouted_after": after,
             "locked": True, "backup": bk,
             "note": "Run run_drc: points are taken as given (no clearance check here)."}
 

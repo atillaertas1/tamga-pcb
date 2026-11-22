@@ -57,9 +57,14 @@ are overwritten by the next `sync_design`, so change the spec instead.
      (e.g. 1 A → 0.5 mm). If you don't know the current, ask; don't guess.
    - If `unmatched_nets` comes back, fix the net names from `board_summary`.
    - Changing after routing: `apply_to_existing=True` + `run_drc`.
-   - Critical nets (USB diff pairs, RF, high speed) → leave to the user or flag them clearly.
+   - Controlled impedance: `set_netclass(name='USB', nets=['USB_DP','USB_DN'], impedance_ohm=90, diff_gap_mm=0.15)`
+     computes the width from the stackup (50 Ω single-ended: no gap). On 2 layers it warns that it is impractical:
+     tell the user, suggest `board.layers=4`, or keep USB full-speed runs short and accept it.
 5. Critical nets (near an isolation barrier, power paths that must stay short, sensitive analog):
-   guide them first with `route_net(net, 'U1.3', 'C5.1', points)` (they stay locked). Then
+   guide them first with `route_net(net, 'U1.3', 'C5.1', points)` (they stay locked). A differential pair:
+   `route_net('USB_DP', 'J1.A6', 'U2.14', centre_points, pair_net='USB_DN', pair_from_pad='J1.A7', pair_to_pad='U2.13')`;
+   check `board_summary(lengths=['USB_D*'])` for skew (it sums every track of a net, so pads joined by other
+   routes, like USB-C's A6/B6, add length). Then
    `autoroute` → `add_copper_zone` (default: GND, both layers + 5 mm stitching vias) → `run_drc`.
    `autoroute` writes to the board itself (with a backup) and first rips up unlocked tracks/vias, so after moving
    parts just run `autoroute` again, then `add_copper_zone` again (it replaces the old pour). Never try to edit

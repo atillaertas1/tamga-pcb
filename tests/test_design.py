@@ -252,3 +252,26 @@ def test_board_shape_layers_holes_and_silk(tmp_path):
     assert text.count("(group") == 1 and "tamga v2" in text and "tamga v1" not in text
     redrawn = design.sync(str(tmp_path), "led", None, {"board": {"corner_radius_mm": 1}})
     assert redrawn["pcb"]["resized"].endswith("r1")
+
+
+DP_SPEC = {"title": "DP", "board": {"width_mm": 40, "height_mm": 20, "layers": 4}, "parts": [
+    {"ref": "J1", "symbol": "Connector_Generic:Conn_01x04", "pins": {"1": "VBUS", "2": "USB_DP", "3": "USB_DN", "4": "GND"},
+     "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"},
+    {"ref": "J2", "symbol": "Connector_Generic:Conn_01x04", "pins": {"1": "VBUS", "2": "USB_DP", "3": "USB_DN", "4": "GND"},
+     "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"}]}
+
+
+def test_differential_pair_with_impedance(tmp_path):
+    """90 Ω çift: genişlik katman yapısından, iki iz paralel ve eşit uzunlukta, kesişmez."""
+    pcb = design.sync(str(tmp_path), "dp", DP_SPEC, None)["files"]["pcb"]
+    server.place_footprints(pcb, [{"ref": "J1", "x": 105, "y": 106.19, "rot": 0},
+                                  {"ref": "J2", "x": 135, "y": 106.19, "rot": 0}])
+    nc = server.set_netclass(pcb, "USB", ["USB_DP", "USB_DN"], impedance_ohm=90, diff_gap_mm=0.15)
+    assert 0.2 <= nc["impedance"]["track_mm"] <= 0.3
+    r = server.route_net(pcb, "USB_DP", "J1.2", "J2.2", [[112, 110], [128, 110]],
+                         pair_net="USB_DN", pair_from_pad="J1.3", pair_to_pad="J2.3")
+    assert r["gap_mm"] == 0.15 and r["skew_mm"] < 0.05
+    lengths = server.board_summary(pcb, lengths=["USB_D*"])
+    assert set(lengths["lengths"]) == {"USB_DP", "USB_DN"} and "USB_DP/USB_DN" in lengths["pairs"]
+    types = {t["type"] for t in server.run_drc(pcb).get("types", [])}
+    assert not types & {"clearance", "shorting_items", "tracks_crossing"}

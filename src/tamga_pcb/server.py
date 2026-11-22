@@ -19,7 +19,7 @@ from pathlib import Path
 import anyio.from_thread
 from mcp.server.mcpserver import Context, MCPServer
 
-from . import design, importer, library, pinout, report, route
+from . import design, impedance, importer, library, pinout, report, route
 from . import parts as parts_mod
 from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
@@ -115,10 +115,12 @@ def sync_design(project_dir: str, name: str, spec: dict | None = None,
 # ------------------------------------------------------------------ okuma
 
 @tool
-def board_summary(pcb_path: str, max_footprints: int = 40) -> dict:
+def board_summary(pcb_path: str, max_footprints: int = 40, lengths: list[str] | None = None) -> dict:
     """Board overview: size, layers, rules, unrouted count, nets (name:pad_count),
-    one line per footprint 'REF VALUE FOOTPRINT @(x,y) rDEG F|B'. Start here."""
-    return run_worker("summary", {"pcb": abspath(pcb_path), "max_footprints": max_footprints})
+    one line per footprint 'REF VALUE FOOTPRINT @(x,y) rDEG F|B'. Start here.
+    lengths=['USB_D*', ...] instead returns routed length and vias per net, and skew of P/N pairs."""
+    return run_worker("summary", {"pcb": abspath(pcb_path), "max_footprints": max_footprints,
+                                  "lengths": lengths or []})
 
 
 @tool
@@ -140,15 +142,27 @@ def place_footprints(pcb_path: str, moves: list[dict]) -> dict:
 def set_netclass(pcb_path: str, name: str, nets: list[str] | None = None,
                  track_mm: float | None = None, clearance_mm: float | None = None,
                  via_mm: float | None = None, via_drill_mm: float | None = None,
-                 apply_to_existing: bool = False) -> dict:
+                 apply_to_existing: bool = False, impedance_ohm: float | None = None,
+                 diff_gap_mm: float | None = None) -> dict:
     """Create/update a netclass and assign nets (exact names or wildcards like '+*V*').
     name='Default' edits the default class. Omitted values are kept. Set BEFORE autoroute;
-    the router uses these widths. apply_to_existing resizes already-routed tracks/vias."""
-    return run_worker("set_netclass", {
+    the router uses these widths. apply_to_existing resizes already-routed tracks/vias.
+    impedance_ohm computes the track width from the board's stackup (with diff_gap_mm: a
+    differential pair, e.g. 90 for USB); warns when 2 layers make it impractical."""
+    imp = None
+    if impedance_ohm:
+        layers = run_worker("summary", {"pcb": abspath(pcb_path), "max_footprints": 0})["copper_layers"]
+        imp = impedance.track_for(impedance_ohm, layers, diff_gap_mm)
+        track_mm = imp["track_mm"]
+    res = run_worker("set_netclass", {
         "pcb": abspath(pcb_path), "name": name, "nets": nets or [],
         "track_mm": track_mm, "clearance_mm": clearance_mm, "via_mm": via_mm,
         "via_drill_mm": via_drill_mm, "apply_to_existing": apply_to_existing,
+        "dp_width_mm": track_mm if diff_gap_mm else None, "dp_gap_mm": diff_gap_mm,
     })
+    if imp:
+        res["impedance"] = imp
+    return res
 
 
 @tool
@@ -184,14 +198,21 @@ def fill_zones(pcb_path: str) -> dict:
 
 @tool
 def route_net(pcb_path: str, net: str, from_pad: str, to_pad: str,
-              points: list[list] | None = None, layer: str = "F.Cu", width_mm: float = 0) -> dict:
+              points: list[list] | None = None, layer: str = "F.Cu", width_mm: float = 0,
+              pair_net: str = "", pair_from_pad: str = "", pair_to_pad: str = "", gap_mm: float = 0) -> dict:
     """Hand-guided route for a critical net: from_pad ('U1.3') -> points -> to_pad.
     points: [[x,y], [x,y,'B.Cu'], ...] mm; a layer change drops a via at that point.
     Width defaults to the net's netclass. Tracks are locked so autoroute keeps them.
+    Differential pair: give pair_net with its pads; points are then the pair's centre line and both
+    tracks run gap_mm apart (defaults from set_netclass impedance). Reports length and skew.
     Route these BEFORE autoroute; then run_drc (no clearance check here)."""
+    if pair_net and not (pair_from_pad and pair_to_pad):
+        raise KicadError("pair_net needs pair_from_pad and pair_to_pad")
     return run_worker("route_net", {"pcb": abspath(pcb_path), "net": net, "from_pad": from_pad,
                                     "to_pad": to_pad, "points": points or [], "layer": layer,
-                                    "width_mm": width_mm or None})
+                                    "width_mm": width_mm or None, "pair_net": pair_net,
+                                    "pair_from_pad": pair_from_pad, "pair_to_pad": pair_to_pad,
+                                    "gap_mm": gap_mm or None})
 
 
 @tool
