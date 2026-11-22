@@ -1,12 +1,12 @@
 {
-  "name": "pcbmcp",
+  "name": "tamga-pcb",
   "description": "KiCad PCB design tools for Claude Code",
   "owner": {
     "name": "Atilla"
   },
   "plugins": [
     {
-      "name": "pcbmcp",
+      "name": "tamga-pcb",
       "source": "./",
       "description": "Token-efficient KiCad PCB design: schematic from a JSON spec, placement, autorouting, DRC/ERC and JLCPCB fab export."
     }

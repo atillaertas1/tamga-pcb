@@ -1,9 +1,9 @@
-"""pcbmcp — KiCad için token-verimli MCP sunucusu.
+"""tamga-pcb — KiCad için token-verimli MCP sunucusu.
 
 Tasarım ilkeleri:
 - Az araç (her araç tanımı her istekte bağlama girer).
 - Ham dosya yok; kompakt, satır-başı-bir-öğe çıktı.
-- Yazan her araç önce .pcbmcp_backups/ altına yedek alır.
+- Yazan her araç önce .tamga_backups/ altına yedek alır.
 - Koordinatlar mm, açılar derece, KiCad'in sayfa koordinatları (Y aşağı doğru artar).
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ Loop: board_summary -> place_footprints -> set_netclass (power nets wider) -> au
 -> add_copper_zone GND -> run_drc until CLEAN -> set_footprint_fields LCSC -> export_fab.
 Never read .kicad_pcb files directly; use these tools. Write tools keep backups."""
 
-mcp = MCPServer("pcbmcp", instructions=INSTRUCTIONS, version="0.1.0")
+mcp = MCPServer("tamga-pcb", instructions=INSTRUCTIONS, version="0.1.0")
 
 
 def tool(fn):
@@ -83,7 +83,7 @@ def find_footprint(query: str = "", pattern: str = "", limit: int = 15) -> dict:
 
 @tool
 def import_lcsc_part(lcsc: str, compare_footprint: str = "") -> dict:
-    """Import an LCSC part (symbol + footprint + 3D) into the pcbmcp_lcsc library when no
+    """Import an LCSC part (symbol + footprint + 3D) into the tamga_lcsc library when no
     KiCad symbol/footprint fits. Checks pin<->pad and, if KiCad has the same part's footprint
     (or compare_footprint given), whether pad numbering matches. On kicad_footprint_mismatch
     do NOT mix: use the KiCad footprint with a KiCad-numbered symbol. Verify vs datasheet."""

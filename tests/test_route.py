@@ -4,7 +4,7 @@ import sys
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import route
+from tamga_pcb import route
 
 LINE = ("2026-11-18 10:47:36.044 INFO   [E7\\A2] Auto-routing pass #3 on board 'bef2' was completed "
         "in 0.14 seconds with score 990.00 (5 unrouted and 1 violations).")
@@ -44,7 +44,7 @@ def test_timeout_reports_where_it_stopped(fake_freerouting, tmp_path):
 
 
 def test_missing_default_jar_is_downloaded_once(monkeypatch, tmp_path):
-    from pcbmcp import doctor
+    from tamga_pcb import doctor
     calls = []
     monkeypatch.delenv("FREEROUTING_JAR", raising=False)
     monkeypatch.setattr(route, "DEFAULT_JAR", tmp_path / "freerouting.jar")
@@ -55,7 +55,7 @@ def test_missing_default_jar_is_downloaded_once(monkeypatch, tmp_path):
 
 
 def test_explicit_jar_is_never_downloaded(monkeypatch, tmp_path):
-    from pcbmcp import doctor
+    from tamga_pcb import doctor
     monkeypatch.setenv("FREEROUTING_JAR", str(tmp_path / "nope.jar"))
     monkeypatch.setattr(doctor, "download_jar", lambda p: pytest.fail("must not download"))
     with pytest.raises(ToolError, match="FREEROUTING_JAR"):

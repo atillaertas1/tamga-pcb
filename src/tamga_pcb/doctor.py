@@ -1,4 +1,4 @@
-"""`pcbmcp doctor [--fix]`: kurulum kontrolü. Rakiplerde en sık şikayet sessiz kurulum hataları.
+"""`tamga doctor [--fix]`: kurulum kontrolü. Rakiplerde en sık şikayet sessiz kurulum hataları.
 
 Zorunlu (yoksa çıkış kodu 1): kicad-cli, pcbnew (sistem Python'u), KiCad kütüphaneleri.
 Autoroute için: Java + Freerouting jar (+ jar'ın istediği Java sürümü, class dosyasından okunur).
@@ -79,7 +79,7 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
     m = re.match(r"(\d+)\.", ver)
     if code != 0 or not m:
         add(False, "kicad-cli", f"not runnable ({KICAD_CLI})",
-            f"install KiCad {MIN_KICAD}+ or set PCBMCP_KICAD_CLI")
+            f"install KiCad {MIN_KICAD}+ or set TAMGA_KICAD_CLI")
     else:
         add(int(m.group(1)) >= MIN_KICAD, "kicad-cli", ver, f"KiCad {MIN_KICAD}+ required (tested on 10.0.x)")
 
@@ -87,12 +87,12 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
     add(code == 0, "pcbnew", f"{pv} ({KICAD_PYTHON})" if code == 0 else f"import failed ({KICAD_PYTHON})",
         "pcbnew lives in KiCad's own Python (Linux: /usr/bin/python3, macOS: KiCad.app/Contents/"
         "Frameworks/Python.framework/Versions/Current/bin/python3, Windows: KiCad\\<ver>\\bin\\python.exe);"
-        " set PCBMCP_KICAD_PYTHON to it")
+        " set TAMGA_KICAD_PYTHON to it")
 
     n_sym = len(list(library.SYM_DIR.glob("*.kicad_sym")))
-    add(n_sym > 0, "symbol libs", f"{n_sym} in {library.SYM_DIR}", "set PCBMCP_SYMBOL_DIR")
+    add(n_sym > 0, "symbol libs", f"{n_sym} in {library.SYM_DIR}", "set TAMGA_SYMBOL_DIR")
     n_fp = len(list(library.FP_DIR.glob("*.pretty")))
-    add(n_fp > 0, "footprint libs", f"{n_fp} in {library.FP_DIR}", "set PCBMCP_FOOTPRINT_DIR")
+    add(n_fp > 0, "footprint libs", f"{n_fp} in {library.FP_DIR}", "set TAMGA_FOOTPRINT_DIR")
 
     out.append(("info", "data dir", f"{paths.DATA_DIR} (imported parts, Freerouting jar)", ""))
 
@@ -106,21 +106,21 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
             out.append(("warn", "freerouting", f"download failed: {e}", f"download {FREEROUTING_URL}"))
     need = jar_java_version(jar) if jar.is_file() else None
     add(jar.is_file(), "freerouting jar", f"{jar} (needs Java {need}+)" if need else f"missing: {jar}",
-        "run `pcbmcp doctor --fix` or set FREEROUTING_JAR (autoroute only)", required=False)
+        "run `tamga doctor --fix` or set FREEROUTING_JAR (autoroute only)", required=False)
     have = java_version(route.JAVA) if shutil.which(route.JAVA) or Path(route.JAVA).is_file() else None
     if have is None:
-        add(False, "java", f"not found ({route.JAVA})", "install a JDK or set PCBMCP_JAVA (autoroute only)",
+        add(False, "java", f"not found ({route.JAVA})", "install a JDK or set TAMGA_JAVA (autoroute only)",
             required=False)
     else:
         add(need is None or have >= need, "java", f"{have}", f"Freerouting jar needs Java {need}+", required=False)
 
     # isteğe bağlı
     add(importlib.util.find_spec("easyeda2kicad") is not None, "easyeda2kicad", "importable",
-        "pip install 'pcbmcp[lcsc]' or uv sync --extra lcsc (import_lcsc_part only)", required=False)
+        "pip install 'tamga-pcb[lcsc]' or uv sync --extra lcsc (import_lcsc_part only)", required=False)
     for name, url in (("jlcsearch", f"{parts.API}/components/list.json?search=ams1117&limit=1"),
                       ("easyeda", pinout.API.format(lcsc="C6186") + "?version=6.4.19.5")):
         try:
-            code = httpx.get(url, headers={"User-Agent": "pcbmcp"}, timeout=10).status_code
+            code = httpx.get(url, headers={"User-Agent": "tamga-pcb"}, timeout=10).status_code
             add(code == 200, name, f"HTTP {code}", "search_parts / pinout check need network",
                 required=False)
         except httpx.HTTPError as e:

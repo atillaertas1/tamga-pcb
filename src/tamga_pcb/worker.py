@@ -32,8 +32,8 @@ def load(path: str) -> "pcbnew.BOARD":
 
 
 def backup(path: str) -> str:
-    """Yazmadan önce .pcbmcp_backups/ altına zaman damgalı kopya al."""
-    d = os.path.join(os.path.dirname(os.path.abspath(path)), ".pcbmcp_backups")
+    """Yazmadan önce .tamga_backups/ altına zaman damgalı kopya al."""
+    d = os.path.join(os.path.dirname(os.path.abspath(path)), ".tamga_backups")
     os.makedirs(d, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     dst = os.path.join(d, f"{stamp}-{os.path.basename(path)}")
@@ -436,8 +436,8 @@ def cmd_set_netclass(a: dict) -> dict:
     return out
 
 
-# Sunucu library.FP_DIRS'ı PCBMCP_FP_DIRS ile geçirir (worker KiCad Python'unda, paketi import edemez).
-FP_DIRS = [p for name in ("PCBMCP_FP_DIRS", "PCBMCP_EXTRA_FOOTPRINT_DIRS")
+# Sunucu library.FP_DIRS'ı TAMGA_FP_DIRS ile geçirir (worker KiCad Python'unda, paketi import edemez).
+FP_DIRS = [p for name in ("TAMGA_FP_DIRS", "TAMGA_EXTRA_FOOTPRINT_DIRS")
            for p in os.environ.get(name, "").split(os.pathsep) if p]
 
 
@@ -729,7 +729,7 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001 — hatayı JSON olarak geri ver
         res = {"ok": False, "error": f"{type(e).__name__}: {e}"}
     # pcbnew stdout'a log basabilir; sonucu ayırt edilebilir son satıra yaz
-    sys.stdout.write("\n@@PCBMCP@@" + json.dumps(res, ensure_ascii=False) + "\n")
+    sys.stdout.write("\n@@TAMGA@@" + json.dumps(res, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

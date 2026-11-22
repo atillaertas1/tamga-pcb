@@ -1,7 +1,7 @@
 """Platforma göre KiCad / kullanıcı dizini tespiti (sahte dosya sistemiyle, KiCad gerekmez)."""
 from pathlib import Path
 
-from pcbmcp import paths
+from tamga_pcb import paths
 
 
 def _touch(p: Path) -> Path:
@@ -36,10 +36,10 @@ def test_kicad_env_vars_win_over_detection():
 
 
 def test_user_dirs_per_platform(tmp_path):
-    assert paths.user_dir("data", "win32", {"LOCALAPPDATA": str(tmp_path)}) == tmp_path / "pcbmcp"
-    assert paths.user_dir("cache", "linux", {"XDG_CACHE_HOME": str(tmp_path)}) == tmp_path / "pcbmcp"
-    assert paths.user_dir("data", "darwin", {}).parts[-3:] == ("Library", "Application Support", "pcbmcp")
+    assert paths.user_dir("data", "win32", {"LOCALAPPDATA": str(tmp_path)}) == tmp_path / "tamga-pcb"
+    assert paths.user_dir("cache", "linux", {"XDG_CACHE_HOME": str(tmp_path)}) == tmp_path / "tamga-pcb"
+    assert paths.user_dir("data", "darwin", {}).parts[-3:] == ("Library", "Application Support", "tamga-pcb")
 
 
 def test_bundled_custom_symbols_ship_in_package():
-    assert (paths.BUNDLED / "symbols" / "pcbmcp_custom.kicad_sym").is_file()
+    assert (paths.BUNDLED / "symbols" / "tamga_custom.kicad_sym").is_file()

@@ -37,5 +37,5 @@ jobs:
           sudo apt-get install -y --no-install-recommends kicad kicad-symbols kicad-footprints
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --extra lcsc
-      - run: uv run pcbmcp doctor --fix
+      - run: uv run tamga doctor --fix
       - run: uv run pytest -q -rs

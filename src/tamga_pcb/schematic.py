@@ -332,7 +332,7 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
         fname = f"{project}-{re.sub(r'[^A-Za-z0-9_.-]', '_', ascii_name)}.kicad_sch"
         items, used, paper, _ = page(groups[name], f"/{root}/{suid}", f"/{suid}", f"/{name}/", fname,
                                      notes=notes_of.get(name, ""))
-        sub = [Sym("kicad_sch"), [Sym("version"), 20250114], [Sym("generator"), "pcbmcp"],
+        sub = [Sym("kicad_sch"), [Sym("version"), 20250114], [Sym("generator"), "tamga-pcb"],
                [Sym("generator_version"), "0.2"], [Sym("uuid"), uid(project, "page", name)],
                [Sym("paper"), paper[0]], [Sym("title_block"), [Sym("title"), name]],
                [Sym("lib_symbols"), *used.values()], *items, [Sym("embedded_fonts"), Sym("no")]]
@@ -377,7 +377,7 @@ def build(spec: dict, project: str) -> tuple[str, dict]:
         bx += w + 12.7
         row_h = max(row_h, h)
 
-    doc = [Sym("kicad_sch"), [Sym("version"), 20250114], [Sym("generator"), "pcbmcp"],
+    doc = [Sym("kicad_sch"), [Sym("version"), 20250114], [Sym("generator"), "tamga-pcb"],
            [Sym("generator_version"), "0.2"], [Sym("uuid"), root], [Sym("paper"), paper[0]]]
     if spec.get("title"):
         doc.append([Sym("title_block"), [Sym("title"), spec["title"]]])

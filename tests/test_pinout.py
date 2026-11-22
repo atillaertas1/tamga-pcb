@@ -3,7 +3,7 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from kicad_env import needs_libs
-from pcbmcp import pinout
+from tamga_pcb import pinout
 
 pytestmark = needs_libs
 

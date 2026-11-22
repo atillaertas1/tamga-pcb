@@ -10,7 +10,7 @@ import re
 import httpx
 from mcp.server.mcpserver.exceptions import ToolError
 
-API = os.environ.get("PCBMCP_JLCSEARCH_URL", "https://jlcsearch.tscircuit.com")
+API = os.environ.get("TAMGA_JLCSEARCH_URL", "https://jlcsearch.tscircuit.com")
 
 
 def _unit_price(price) -> float | None:

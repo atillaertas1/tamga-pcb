@@ -1,6 +1,6 @@
 """LCSC parçasını KiCad kütüphanesine içe aktar (easyeda2kicad + kicad-cli upgrade).
 
-Çıktı (paths.DATA_DIR altında): symbols/pcbmcp_lcsc.kicad_sym, footprints/pcbmcp_lcsc.pretty/, footprints/pcbmcp_lcsc.3dshapes/
+Çıktı (paths.DATA_DIR altında): symbols/tamga_lcsc.kicad_sym, footprints/tamga_lcsc.pretty/, footprints/tamga_lcsc.3dshapes/
 
 EasyEDA dönüşümünün doğruluğu garanti değil. Gerçek örnek: Hirose DF40C-100DS için EasyEDA
 pad'leri U şeklinde (bir sıra 1..50) numaralar, KiCad/Hirose tek-çift (1 ve 2 karşılıklı).
@@ -23,11 +23,11 @@ from . import library, paths, sexpr
 from .kicad import cli
 from .sexpr import children
 
-LIB = "pcbmcp_lcsc"
+LIB = "tamga_lcsc"
 
 
 def _paths() -> dict[str, Path]:
-    root = Path(os.environ.get("PCBMCP_IMPORT_DIR", paths.DATA_DIR))
+    root = Path(os.environ.get("TAMGA_IMPORT_DIR", paths.DATA_DIR))
     return {"sym": root / "symbols" / f"{LIB}.kicad_sym",
             "fp": root / "footprints" / f"{LIB}.pretty",
             "3d": root / "footprints" / f"{LIB}.3dshapes"}
@@ -38,7 +38,7 @@ def _require_easyeda() -> None:
     bir ToolError fırlat; kuruluysa hiçbir şey yapma."""
     if importlib.util.find_spec("easyeda2kicad") is None:
         raise ToolError("import_lcsc_part needs easyeda2kicad (optional, AGPL-3.0, installed separately): "
-                        "pip install 'pcbmcp[lcsc]'  or  uv sync --extra lcsc")
+                        "pip install 'tamga-pcb[lcsc]'  or  uv sync --extra lcsc")
 
 
 def _convert(lcsc: str, out: Path) -> None:

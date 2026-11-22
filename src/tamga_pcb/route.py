@@ -18,7 +18,7 @@ from pathlib import Path
 from . import paths
 from .kicad import KicadError, run_worker
 
-JAVA = os.environ.get("PCBMCP_JAVA", "java")
+JAVA = os.environ.get("TAMGA_JAVA", "java")
 DEFAULT_JAR = paths.DATA_DIR / "freerouting.jar"
 
 
@@ -36,7 +36,7 @@ def jar_path() -> Path:
                              f"{doctor.FREEROUTING_URL} to {p} or set FREEROUTING_JAR.") from None
     if not p.is_file():
         raise KicadError(f"Freerouting jar not found at {p} (FREEROUTING_JAR). Unset it to download "
-                         "automatically, or run `pcbmcp doctor --fix`.")
+                         "automatically, or run `tamga doctor --fix`.")
     return p
 
 
@@ -82,7 +82,7 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
     # yazmak tehlikeliydi: KiCad kuralları AYNI ADLI .kicad_pro/.kicad_dru'dan okur, o dosyada DRC
     # varsayılan kurallarla koşup netclass'ları ve özel kuralları (ör. izolasyon) sessizce atlıyordu.
     out = out or pcb
-    work = Path(tempfile.mkdtemp(prefix="pcbmcp-route-"))
+    work = Path(tempfile.mkdtemp(prefix="tamga-pcb-route-"))
     dsn, ses = work / "board.dsn", work / "board.ses"
     try:
         run_worker("export_dsn", {"pcb": pcb, "dsn": str(dsn)})

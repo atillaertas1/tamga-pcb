@@ -19,7 +19,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from .library import CACHE, _natural, resolve_symbol, symbol_pins
 
-API = os.environ.get("PCBMCP_EASYEDA_URL", "https://easyeda.com/api/products/{lcsc}/components")
+API = os.environ.get("TAMGA_EASYEDA_URL", "https://easyeda.com/api/products/{lcsc}/components")
 
 # Aynı işlevin farklı yazılışları (normalize edilmiş, büyük harf)
 ALIASES = [
@@ -43,7 +43,7 @@ def _fetch(lcsc: str) -> dict:
         for wait in (0, 2, 5):
             time.sleep(wait)
             r = httpx.get(API.format(lcsc=lcsc), params={"version": "6.4.19.5"},
-                          headers={"User-Agent": "pcbmcp"}, timeout=20)
+                          headers={"User-Agent": "tamga-pcb"}, timeout=20)
             if r.status_code not in (403, 429):
                 break
         r.raise_for_status()

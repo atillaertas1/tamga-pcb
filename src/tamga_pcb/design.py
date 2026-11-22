@@ -40,9 +40,9 @@ def _copy_lib(src: Path, dst: Path) -> None:
 
 
 def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
-    """Stok olmayan kütüphaneleri (pcbmcp_custom, pcbmcp_lcsc...) projenin lib/ klasörüne kopyala ve
+    """Stok olmayan kütüphaneleri (tamga_custom, tamga_lcsc...) projenin lib/ klasörüne kopyala ve
     sym-lib-table / fp-lib-table'a ${KIPRJMOD}/lib/... olarak ekle. Kullanıcının kendi kayıtlarına
-    dokunmaz; pcbmcp'nin eski kayıtlarını (descr 'pcbmcp...') yeni yola taşır. -> eklenen/taşınanlar"""
+    dokunmaz; tamga-pcb'nin eski kayıtlarını (descr 'tamga-pcb...') yeni yola taşır. -> eklenen/taşınanlar"""
     added = []
     for kind, table, key in (("sym", "sym-lib-table", "symbol"), ("fp", "fp-lib-table", "footprint")):
         libs = sorted({p[key].split(":", 1)[0] for p in spec["parts"] if ":" in p.get(key, "")})
@@ -60,8 +60,8 @@ def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
             uri = "${KIPRJMOD}/" + LOCAL_LIBS + "/" + path.name
             if (e := have.get(lib)) is None:
                 tree.append([S("lib"), [S("name"), lib], [S("type"), "KiCad"], [S("uri"), uri],
-                             [S("options"), ""], [S("descr"), "pcbmcp"]])
-            elif str(sexpr.value(e, "descr") or "").startswith("pcbmcp") and sexpr.value(e, "uri") != uri:
+                             [S("options"), ""], [S("descr"), "tamga-pcb"]])
+            elif str(sexpr.value(e, "descr") or "").startswith("tamga-pcb") and sexpr.value(e, "uri") != uri:
                 sexpr.child(e, "uri")[1] = uri
             else:
                 continue
@@ -196,7 +196,7 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
     for fname, page_text in meta["pages"].items():
         (paths["dir"] / fname).write_text(page_text, encoding="utf-8", newline="\n")
     for old in paths["dir"].glob(f"{name}-*.kicad_sch"):
-        if old.name not in meta["pages"] and '(generator "pcbmcp")' in old.read_text(encoding="utf-8")[:300]:
+        if old.name not in meta["pages"] and '(generator "tamga-pcb")' in old.read_text(encoding="utf-8")[:300]:
             old.unlink()
     libs_added = ensure_lib_tables(paths["dir"], spec)
 

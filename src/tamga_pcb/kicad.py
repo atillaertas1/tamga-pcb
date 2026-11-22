@@ -12,7 +12,7 @@ from .paths import KICAD_CLI, KICAD_PYTHON  # noqa: F401  (platforma göre tespi
 
 # pcbnew modülü KiCad'in kendi Python'unda yaşar, venv'de değil.
 WORKER = Path(__file__).with_name("worker.py")
-MARK = "@@PCBMCP@@"
+MARK = "@@TAMGA@@"
 
 
 class KicadError(ToolError):
@@ -27,7 +27,7 @@ def abspath(p: str) -> str:
 def run_worker(cmd: str, args: dict, timeout: int = 300) -> dict:
     """worker.py'yi sistem Python'u ile çalıştır, son işaretli JSON satırını döndür."""
     from . import library  # döngüsel import olmasın; testlerdeki monkeypatch'ler de geçsin
-    env = {**os.environ, "PCBMCP_FP_DIRS": os.pathsep.join(map(str, library.FP_DIRS)),
+    env = {**os.environ, "TAMGA_FP_DIRS": os.pathsep.join(map(str, library.FP_DIRS)),
            "PYTHONUTF8": "1"}  # Windows: KiCad Python varsayılanı cp1252, JSON/dosyalar UTF-8
     try:
         proc = subprocess.run(

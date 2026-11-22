@@ -5,7 +5,7 @@ import json
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import blocks, design
+from tamga_pcb import blocks, design
 from kicad_env import needs_kicad
 
 R = "Resistor_SMD:R_0805_2012Metric"

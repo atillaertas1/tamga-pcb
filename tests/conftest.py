@@ -1,7 +1,7 @@
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import pinout
+from tamga_pcb import pinout
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,4 @@
-from pcbmcp.report import summarize
+from tamga_pcb.report import summarize
 
 
 def _v(typ, sev, *descs):

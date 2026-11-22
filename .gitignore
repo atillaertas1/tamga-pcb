@@ -2,7 +2,7 @@
 __pycache__/
 .pytest_cache/
 tools/*.jar
-.pcbmcp_backups/
+.tamga_backups/
 **/fab/
 *_routed.kicad_pcb
 *.png

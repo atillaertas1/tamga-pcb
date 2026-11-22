@@ -1,6 +1,6 @@
 (kicad_symbol_lib
 	(version 20241209)
-	(generator "pcbmcp")
+	(generator "tamga-pcb")
 	(generator_version "1")
 	(symbol "Conn_02x50_Odd_Even"
 		(pin_names (offset 1.016) (hide yes))

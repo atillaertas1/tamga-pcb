@@ -1,6 +1,9 @@
-# pcbmcp — AI-assisted KiCad PCB design over MCP
+# tamga-pcb — AI-assisted KiCad PCB design over MCP
 
 [Türkçe](README.tr.md) · MIT licensed
+
+Named after the *tamga*, the seal Turkic clans stamped onto stone, metal and coins: a mark pressed
+permanently into a surface, much like a circuit etched into copper.
 
 An MCP server that lets Claude Code (or any MCP client) design, place, route, check and export
 KiCad boards **token-efficiently**: from a short JSON circuit description to a DRC-clean board and a
@@ -18,27 +21,27 @@ JLCPCB fabrication package.
 
 Linux, macOS and Windows. KiCad is located automatically (`/usr/share/kicad`, `KiCad.app`,
 `%ProgramFiles%\KiCad\<version>`). Linux is the most tested platform; on macOS/Windows please run
-`pcbmcp doctor` and open an issue if something is not found.
+`tamga doctor` and open an issue if something is not found.
 
 ## Install (Claude Code plugin)
 In Claude Code:
 ```
-/plugin install pcbmcp --marketplace <owner>/<repo>
+/plugin install tamga-pcb --marketplace atillaertas1/tamga-pcb
 ```
-On older Claude Code versions: `/plugin marketplace add <owner>/<repo>`, then `/plugin install pcbmcp@pcbmcp`.
+On older Claude Code versions: `/plugin marketplace add atillaertas1/tamga-pcb`, then `/plugin install tamga-pcb@tamga-pcb`.
 
 The plugin brings the MCP server (20 tools) and the `pcb-design` skill (design loop, JLCPCB limits,
 review checklist). On first start `uv` builds its environment, and the first `autoroute` downloads
 Freerouting. Nothing else to set up; it works in any project folder.
 
-If something is not found, ask Claude to "run the pcbmcp doctor": it checks KiCad, pcbnew, Java and the
+If something is not found, ask Claude to "run the tamga doctor": it checks KiCad, pcbnew, Java and the
 network and names the environment variable to set for anything it cannot detect.
 
 **Without the plugin system** (other MCP clients): clone the repo and register
-`uv run --directory /path/to/pcbmcp --extra lcsc pcbmcp` as a stdio server.
+`uv run --directory /path/to/tamga-pcb --extra lcsc tamga` as a stdio server.
 
-If detection fails, set any of `PCBMCP_KICAD_CLI`, `PCBMCP_KICAD_PYTHON` (KiCad's own Python, the one that
-can `import pcbnew`), `PCBMCP_SYMBOL_DIR`, `PCBMCP_FOOTPRINT_DIR`, `PCBMCP_JAVA`, `FREEROUTING_JAR`.
+If detection fails, set any of `TAMGA_KICAD_CLI`, `TAMGA_KICAD_PYTHON` (KiCad's own Python, the one that
+can `import pcbnew`), `TAMGA_SYMBOL_DIR`, `TAMGA_FOOTPRINT_DIR`, `TAMGA_JAVA`, `FREEROUTING_JAR`.
 
 ## Tools
 **Design:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
@@ -74,7 +77,7 @@ Parts with an `lcsc` number are checked against the real LCSC pinout.
 gets its own schematic sheet, stable refs (`ref_base` / `refs`) and prefixed nets.
 
 **Parts not in KiCad:** `import_lcsc_part("C597931")` (needs the `lcsc` extra) converts the EasyEDA part
-into the `pcbmcp_lcsc` library in your data directory and compares its pad numbering with KiCad's
+into the `tamga_lcsc` library in your data directory and compares its pad numbering with KiCad's
 footprint when one exists. Non-stock libraries are copied into `<project>/lib/`, so a project folder is
 self-contained and can be shared as is.
 
@@ -89,7 +92,7 @@ self-contained and can be shared as is.
 
 ## Development
 ```bash
-git clone <repo-url> pcbmcp && cd pcbmcp
+git clone https://github.com/atillaertas1/tamga-pcb tamga-pcb && cd tamga-pcb
 uv sync --extra lcsc
 uv run pytest -q          # KiCad-dependent tests are skipped when KiCad is not installed
 claude --plugin-dir .     # run Claude Code with your working copy as the plugin

@@ -1,6 +1,9 @@
-# pcbmcp — AI destekli KiCad PCB tasarımı (MCP)
+# tamga-pcb — AI destekli KiCad PCB tasarımı (MCP)
 
 [English](README.md) · MIT lisansı
+
+Adını Türk boylarının taşa, madene ve sikkelere vurduğu *tamga*dan alır: bir yüzeye kalıcı olarak
+basılan işaret, tıpkı bakıra işlenen bir devre gibi.
 
 Claude Code'un (veya herhangi bir MCP istemcisinin) KiCad kartlarını **token-verimli** biçimde
 okuyup düzenlemesini, rotalamasını, doğrulamasını ve üretime çıkarmasını sağlayan MCP sunucusu.
@@ -8,7 +11,7 @@ okuyup düzenlemesini, rotalamasını, doğrulamasını ve üretime çıkarması
 ## Mimari
 
 ```
-Claude Code ──MCP/stdio──> pcbmcp (uv venv, mcp 2.x)
+Claude Code ──MCP/stdio──> tamga-pcb (uv venv, mcp 2.x)
                             ├── kicad-cli        : DRC, ERC, gerber/drill, render, Altium import
                             ├── worker.py (alt süreç, KiCad'in Python'u + pcbnew SWIG)
                             │     summary, footprint, place, zone, fields, DSN/SES, BOM/CPL
@@ -40,27 +43,27 @@ Neden böyle:
 
 ## Kurulum
 Gerekenler: KiCad 10, [uv](https://docs.astral.sh/uv/), autoroute için Java 25+. Linux, macOS ve Windows;
-KiCad yolları otomatik bulunur, `PCBMCP_KICAD_CLI`, `PCBMCP_KICAD_PYTHON`, `PCBMCP_SYMBOL_DIR`,
-`PCBMCP_FOOTPRINT_DIR` ile ezilebilir.
+KiCad yolları otomatik bulunur, `TAMGA_KICAD_CLI`, `TAMGA_KICAD_PYTHON`, `TAMGA_SYMBOL_DIR`,
+`TAMGA_FOOTPRINT_DIR` ile ezilebilir.
 Claude Code plugin'i olarak (Claude Code içinde):
 ```
-/plugin install pcbmcp --marketplace <owner>/<repo>
+/plugin install tamga-pcb --marketplace atillaertas1/tamga-pcb
 ```
-Eski sürümlerde: `/plugin marketplace add <owner>/<repo>`, sonra `/plugin install pcbmcp@pcbmcp`.
+Eski sürümlerde: `/plugin marketplace add atillaertas1/tamga-pcb`, sonra `/plugin install tamga-pcb@tamga-pcb`.
 Plugin MCP sunucusunu ve `pcb-design` skill'ini getirir; her proje klasöründe çalışır. İlk açılışta `uv`
 ortamı kurar, ilk `autoroute` Freerouting'i indirir.
 
 Geliştirme:
 ```bash
-git clone <repo-url> pcbmcp && cd pcbmcp
+git clone https://github.com/atillaertas1/tamga-pcb tamga-pcb && cd tamga-pcb
 uv sync --extra lcsc
-uv run pcbmcp doctor          # KiCad/pcbnew/Java kontrolü (--fix: Freerouting'i şimdi indir)
+uv run tamga doctor          # KiCad/pcbnew/Java kontrolü (--fix: Freerouting'i şimdi indir)
 uv run pytest -q              # KiCad gerektiren testler KiCad yoksa atlanır
 claude --plugin-dir .         # çalışma kopyasını plugin olarak yükle
 ```
 
-İçe aktarılan parçalar ve Freerouting jar kullanıcı veri dizininde durur (`pcbmcp doctor` gösterir;
-`PCBMCP_DATA_DIR` ile değişir). Stok olmayan kütüphaneler projenin `lib/` klasörüne kopyalanır, proje
+İçe aktarılan parçalar ve Freerouting jar kullanıcı veri dizininde durur (`tamga doctor` gösterir;
+`TAMGA_DATA_DIR` ile değişir). Stok olmayan kütüphaneler projenin `lib/` klasörüne kopyalanır, proje
 tek başına taşınabilir.
 
 ## Örnek oturum
@@ -96,11 +99,11 @@ yazılmaz, mevcut pinler listelenir. Düzenleme için `patch={parts:[{ref:"R1", 
 
 Doğrulama: her senkronda pin↔pad numara kontrolü (eksik pad = hiçbir dosya yazılmaz) ve
 `lcsc` olan parçalarda sembol pinout'u ↔ gerçek LCSC parçası (EasyEDA verisi, uyarı olarak).
-Stok olmayan kütüphaneler (`pcbmcp_custom`, `pcbmcp_lcsc`) projenin `lib/` klasörüne kopyalanır ve
+Stok olmayan kütüphaneler (`tamga_custom`, `tamga_lcsc`) projenin `lib/` klasörüne kopyalanır ve
 `sym-lib-table`/`fp-lib-table`'a `${KIPRJMOD}/lib/...` olarak otomatik eklenir.
 
 KiCad'de olmayan parça (`[lcsc]` extra'sı gerekir): `import_lcsc_part("C597931")` → veri dizininde
-`symbols/pcbmcp_lcsc.kicad_sym`, `footprints/pcbmcp_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
+`symbols/tamga_lcsc.kicad_sym`, `footprints/tamga_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
 footprint'i varsa pad numaralandırması karşılaştırılır (ör. Hirose DF40'ta EasyEDA U-numaralı,
 KiCad tek/çift → 100/100 pad farklı; uyarı verir).
 

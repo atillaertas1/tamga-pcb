@@ -1,5 +1,5 @@
 """Platforma göre yollar: KiCad kurulumu (kicad-cli, pcbnew'li Python, stok kütüphaneler) ve
-kullanıcı veri/önbellek dizinleri. Her değer PCBMCP_* env ile ezilebilir; env yoksa tespit edilir.
+kullanıcı veri/önbellek dizinleri. Her değer TAMGA_* env ile ezilebilir; env yoksa tespit edilir.
 
 Linux   : PATH / /usr/bin/python3 / /usr/share/kicad
 macOS   : /Applications/KiCad/KiCad.app (Contents/MacOS, Frameworks/Python.framework, SharedSupport)
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent
-BUNDLED = PACKAGE / "data"  # wheel ile gelen kütüphaneler (pcbmcp_custom)
+BUNDLED = PACKAGE / "data"  # wheel ile gelen kütüphaneler (tamga_custom)
 
 
 def _platform(system: str | None = None) -> str:
@@ -63,28 +63,28 @@ def kicad_install(system: str | None = None, env: os._Environ | dict | None = No
 
 
 def user_dir(kind: str, system: str | None = None, env: os._Environ | dict | None = None) -> Path:
-    """kind 'data' | 'cache': platformun kullanıcıya ait pcbmcp dizini."""
+    """kind 'data' | 'cache': platformun kullanıcıya ait tamga-pcb dizini."""
     env = os.environ if env is None else env
     home = Path.home()
     plat = _platform(system)
     if plat == "win":
-        base = Path(env.get("LOCALAPPDATA", home / "AppData" / "Local")) / "pcbmcp"
+        base = Path(env.get("LOCALAPPDATA", home / "AppData" / "Local")) / "tamga-pcb"
         return base / "cache" if kind == "cache" else base
     if plat == "mac":
-        return home / "Library" / ("Caches" if kind == "cache" else "Application Support") / "pcbmcp"
+        return home / "Library" / ("Caches" if kind == "cache" else "Application Support") / "tamga-pcb"
     if kind == "cache":
-        return Path(env.get("XDG_CACHE_HOME", home / ".cache")) / "pcbmcp"
-    return Path(env.get("XDG_DATA_HOME", home / ".local" / "share")) / "pcbmcp"
+        return Path(env.get("XDG_CACHE_HOME", home / ".cache")) / "tamga-pcb"
+    return Path(env.get("XDG_DATA_HOME", home / ".local" / "share")) / "tamga-pcb"
 
 
 _K = kicad_install()
-KICAD_CLI = os.environ.get("PCBMCP_KICAD_CLI", _K["cli"])
-KICAD_PYTHON = os.environ.get("PCBMCP_KICAD_PYTHON", _K["python"])
-SYMBOL_DIR = Path(os.environ.get("PCBMCP_SYMBOL_DIR", _K["symbols"]))
-FOOTPRINT_DIR = Path(os.environ.get("PCBMCP_FOOTPRINT_DIR", _K["footprints"]))
-# İçe aktarılan parçalar (pcbmcp_lcsc) ve indirilen Freerouting jar burada durur.
-DATA_DIR = Path(os.environ.get("PCBMCP_DATA_DIR", user_dir("data"))).expanduser()
-CACHE_DIR = Path(os.environ.get("PCBMCP_CACHE_DIR", user_dir("cache"))).expanduser()
+KICAD_CLI = os.environ.get("TAMGA_KICAD_CLI", _K["cli"])
+KICAD_PYTHON = os.environ.get("TAMGA_KICAD_PYTHON", _K["python"])
+SYMBOL_DIR = Path(os.environ.get("TAMGA_SYMBOL_DIR", _K["symbols"]))
+FOOTPRINT_DIR = Path(os.environ.get("TAMGA_FOOTPRINT_DIR", _K["footprints"]))
+# İçe aktarılan parçalar (tamga_lcsc) ve indirilen Freerouting jar burada durur.
+DATA_DIR = Path(os.environ.get("TAMGA_DATA_DIR", user_dir("data"))).expanduser()
+CACHE_DIR = Path(os.environ.get("TAMGA_CACHE_DIR", user_dir("cache"))).expanduser()
 
 
 def env_dirs(name: str) -> list[Path]:

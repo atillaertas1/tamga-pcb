@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pcbmcp import library, paths, route
+from tamga_pcb import library, paths, route
 
 
 def _runs(*cmd: str) -> bool:

@@ -1,14 +1,14 @@
 ---
 name: pcb-design
-description: Use when designing, placing, routing, reviewing or exporting a KiCad PCB with the pcbmcp tools. Holds the design loop, JLCPCB fab limits and the placement/review checklist.
+description: Use when designing, placing, routing, reviewing or exporting a KiCad PCB with the tamga-pcb tools. Holds the design loop, JLCPCB fab limits and the placement/review checklist.
 ---
 
-# PCB design loop (pcbmcp)
+# PCB design loop (tamga-pcb)
 
 ## Rules
 - **Never** Read `.kicad_pcb` / `.kicad_sch` files; use `board_summary`, `get_footprint`.
 - Project files (`.kicad_pro`) carry the design rules; when copying a board, copy the whole folder.
-- Write tools keep backups (`.pcbmcp_backups/`). Still suggest a git commit before big steps.
+- Write tools keep backups (`.tamga_backups/`). Still suggest a git commit before big steps.
 - Renders (`render_board`) are expensive: look only when placement is done and at the final review.
 - Reply in the user's language.
 
@@ -58,7 +58,7 @@ are overwritten by the next `sync_design`, so change the spec instead.
 
 ## Setup problems
 If a tool reports that KiCad, pcbnew or Freerouting cannot be found, run the doctor and show the user its
-output: `uv run --directory "<pcbmcp plugin root>" pcbmcp doctor --fix`. The plugin root is two levels above
+output: `uv run --directory "<tamga-pcb plugin root>" tamga doctor --fix`. The plugin root is two levels above
 this skill's folder. It names the environment variable to set for anything it cannot detect.
 
 ## JLCPCB standard 2/4-layer limits (2026)

@@ -20,16 +20,16 @@ from . import paths, sexpr
 from .sexpr import Sym, child, children, value
 
 SYM_DIR = paths.SYMBOL_DIR
-# Stok olmayanlar: paketle gelen (pcbmcp_custom), içe aktarılan (veri dizini), PCBMCP_EXTRA_SYMBOL_DIRS.
+# Stok olmayanlar: paketle gelen (tamga_custom), içe aktarılan (veri dizini), TAMGA_EXTRA_SYMBOL_DIRS.
 SYM_DIRS = [SYM_DIR, paths.BUNDLED / "symbols", paths.DATA_DIR / "symbols",
-            *paths.env_dirs("PCBMCP_EXTRA_SYMBOL_DIRS")]
+            *paths.env_dirs("TAMGA_EXTRA_SYMBOL_DIRS")]
 
 
 def _sym_files() -> list[Path]:
     return [p for d in SYM_DIRS if d.is_dir() for p in sorted(d.glob("*.kicad_sym"))]
 FP_DIR = paths.FOOTPRINT_DIR
 FP_DIRS = [FP_DIR, paths.BUNDLED / "footprints", paths.DATA_DIR / "footprints",
-           *paths.env_dirs("PCBMCP_EXTRA_FOOTPRINT_DIRS")]
+           *paths.env_dirs("TAMGA_EXTRA_FOOTPRINT_DIRS")]
 CACHE = paths.CACHE_DIR
 
 _TOP_SYM = re.compile(r'^\t\(symbol "([^"]+)"', re.M)

@@ -2,7 +2,7 @@ import httpx
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import parts
+from tamga_pcb import parts
 
 FAKE = {"components": [
     {"lcsc": 1, "mfr": "EXT", "package": "0402", "stock": 9_000_000, "price": 0.001,

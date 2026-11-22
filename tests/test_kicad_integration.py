@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from pcbmcp import server
+from tamga_pcb import server
 from kicad_env import JAR, needs_kicad, needs_router
-from pcbmcp.kicad import KICAD_PYTHON, KicadError
+from tamga_pcb.kicad import KICAD_PYTHON, KicadError
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -68,7 +68,7 @@ def test_autoroute_without_jar_gives_clear_error(board, monkeypatch, tmp_path):
 
 
 def test_netclass_persists_and_reaches_dsn(board, tmp_path):
-    from pcbmcp.kicad import run_worker
+    from tamga_pcb.kicad import run_worker
     r = server.set_netclass(board, "POWER", ["VIN", "+3V3", "NOPE"], track_mm=0.5, via_mm=0.8,
                             via_drill_mm=0.4)
     assert r["netclass"].startswith("POWER(t0.5,c0.2,v0.8/0.4): +3V3 VIN")
@@ -86,7 +86,7 @@ def test_netclass_persists_and_reaches_dsn(board, tmp_path):
 
 
 def test_netclass_wildcard_and_resize(board):
-    from pcbmcp.kicad import run_worker  # noqa: F401
+    from tamga_pcb.kicad import run_worker  # noqa: F401
     r = server.set_netclass(board, "PWR", ["+*V*"], track_mm=0.4, apply_to_existing=True)
     assert r["netclass"].endswith(": +3V3")
     assert r["resized_items"] == 0  # henüz iz yok
@@ -103,7 +103,7 @@ def test_autoroute_end_to_end(board, monkeypatch):
 
 
 def test_dsn_export(board, tmp_path):
-    from pcbmcp.kicad import run_worker
+    from tamga_pcb.kicad import run_worker
     dsn = tmp_path / "b.dsn"
     run_worker("export_dsn", {"pcb": board, "dsn": str(dsn)})
     text = dsn.read_text()
@@ -163,5 +163,5 @@ def test_autoroute_writes_in_place_with_backup(board, monkeypatch):
     monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
     r = server.autoroute(board, max_passes=20)
     assert r["out"] == board and r["unrouted_after"] == 0
-    assert list((Path(board).parent / ".pcbmcp_backups").glob("*ldo.kicad_pcb"))
+    assert list((Path(board).parent / ".tamga_backups").glob("*ldo.kicad_pcb"))
     assert not list(Path(board).parent.glob("*_routed.kicad_pcb"))

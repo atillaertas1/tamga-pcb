@@ -1,4 +1,4 @@
-"""pcbmcp doctor: sürüm tespiti ve çıkış kodu (ağsız)."""
+"""tamga doctor: sürüm tespiti ve çıkış kodu (ağsız)."""
 import struct
 import sys
 import zipfile
@@ -6,7 +6,7 @@ import zipfile
 import httpx
 import pytest
 
-from pcbmcp import doctor
+from tamga_pcb import doctor
 
 
 def test_jar_java_version_from_class_file(tmp_path):
@@ -33,4 +33,4 @@ def test_missing_kicad_fails_with_hint(monkeypatch, capsys):
     monkeypatch.setattr(doctor.httpx, "get", lambda *a, **k: httpx.Response(200))
     assert doctor.main([]) == 1
     out = capsys.readouterr().out
-    assert "✗ kicad-cli" in out and "PCBMCP_KICAD_CLI" in out and "required checks failed" in out
+    assert "✗ kicad-cli" in out and "TAMGA_KICAD_CLI" in out and "required checks failed" in out

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import design, library, sexpr, server
+from tamga_pcb import design, library, sexpr, server
 from kicad_env import JAR, needs_kicad, needs_router
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +105,7 @@ def test_missing_pad_writes_nothing(tmp_path):
 
 
 def test_pinout_warning_in_sync(tmp_path, monkeypatch):
-    from pcbmcp import pinout
+    from tamga_pcb import pinout
     from test_pinout import easyeda
     db = {"C2286": easyeda("KT-0603R", {"1": "A", "2": "K"})}
     monkeypatch.setattr(pinout, "_fetch", lambda lcsc: db[lcsc] if lcsc in db else
