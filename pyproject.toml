@@ -2,12 +2,19 @@
 name = "pcbmcp"
 version = "0.1.0"
 description = "Token-efficient MCP server for AI-assisted PCB design with KiCad"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Atilla" }]
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=2.3,<3",
     "httpx>=0.27",
-    "easyeda2kicad>=1.0.1",
 ]
+
+[project.optional-dependencies]
+# AGPL-3.0; kept optional and invoked as a subprocess so pcbmcp itself stays MIT.
+lcsc = ["easyeda2kicad>=1.0.1"]
 
 [project.scripts]
 pcbmcp = "pcbmcp.server:main"

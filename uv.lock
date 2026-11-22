@@ -426,9 +426,13 @@ name = "pcbmcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "easyeda2kicad" },
     { name = "httpx" },
     { name = "mcp" },
+]
+
+[package.optional-dependencies]
+lcsc = [
+    { name = "easyeda2kicad" },
 ]
 
 [package.dev-dependencies]
@@ -438,10 +442,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "easyeda2kicad", specifier = ">=1.0.1" },
+    { name = "easyeda2kicad", marker = "extra == 'lcsc'", specifier = ">=1.0.1" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=2.3,<3" },
 ]
+provides-extras = ["lcsc"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]
