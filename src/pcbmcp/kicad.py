@@ -27,11 +27,12 @@ def abspath(p: str) -> str:
 def run_worker(cmd: str, args: dict, timeout: int = 300) -> dict:
     """worker.py'yi sistem Python'u ile çalıştır, son işaretli JSON satırını döndür."""
     from . import library  # döngüsel import olmasın; testlerdeki monkeypatch'ler de geçsin
-    env = {**os.environ, "PCBMCP_FP_DIRS": os.pathsep.join(map(str, library.FP_DIRS))}
+    env = {**os.environ, "PCBMCP_FP_DIRS": os.pathsep.join(map(str, library.FP_DIRS)),
+           "PYTHONUTF8": "1"}  # Windows: KiCad Python varsayılanı cp1252, JSON/dosyalar UTF-8
     try:
         proc = subprocess.run(
             [KICAD_PYTHON, str(WORKER), cmd, json.dumps(args)],
-            capture_output=True, text=True, timeout=timeout, env=env,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, env=env,
         )
     except subprocess.TimeoutExpired:  # ToolError değilse model sadece "Error executing tool" görür
         raise KicadError(f"worker '{cmd}' timed out after {timeout}s") from None
@@ -58,7 +59,7 @@ def cli(*args: str, timeout: int = 300, ok_codes: tuple[int, ...] = (0,),
         retries: int = 2) -> subprocess.CompletedProcess:
     for attempt in range(retries + 1):
         try:
-            proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, timeout=timeout)
+            proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
         except subprocess.TimeoutExpired:
             raise KicadError(f"kicad-cli {' '.join(args[:3])} timed out after {timeout}s") from None
         # Negatif kod = sinyal (KiCad 10.0.7'de aralıklı 'double free' çökmesi görüldü): tekrar dene
@@ -81,10 +82,10 @@ def drc_json(pcb: str, out_json: str, refill: bool = False, parity: bool = False
         args.append("--schematic-parity")
     # exit 5 = ihlal bulundu (normal durum), diğer sıfır olmayanlar gerçek hata
     cli(*args, pcb, ok_codes=(0, 5))
-    return json.loads(Path(out_json).read_text())
+    return json.loads(Path(out_json).read_text(encoding="utf-8"))
 
 
 def erc_json(sch: str, out_json: str) -> dict:
     cli("sch", "erc", "--format", "json", "--severity-error", "--severity-warning",
         "--exit-code-violations", "-o", out_json, sch, ok_codes=(0, 5))
-    return json.loads(Path(out_json).read_text())
+    return json.loads(Path(out_json).read_text(encoding="utf-8"))

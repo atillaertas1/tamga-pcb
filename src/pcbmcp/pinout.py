@@ -60,7 +60,7 @@ def part_pins(lcsc: str) -> dict:
     lcsc = lcsc.upper()
     cache = CACHE / "easyeda" / f"{lcsc}.json"
     if cache.is_file():
-        return json.loads(cache.read_text())
+        return json.loads(cache.read_text(encoding="utf-8"))
     res = _fetch(lcsc)
     pins = {}
     # Pin şekli: "P~show~elec~NUM~x~y~rot~id~lock ^^ ... ^^ 1~x~y~rot~NAME~..." (3. segment = ad)
@@ -70,7 +70,7 @@ def part_pins(lcsc: str) -> dict:
             pins[seg[0].split("~")[3]] = seg[3].split("~")[4]
     out = {"title": res.get("title", ""), "pins": pins}
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(out))
+    cache.write_text(json.dumps(out), encoding="utf-8", newline="\n")
     return out
 
 

@@ -58,11 +58,11 @@ def symbol_index() -> dict[str, list[list[str]]]:
     cache_file = CACHE / "symbol_index.json"
     stamp = {str(p): p.stat().st_mtime for p in _sym_files()}
     if cache_file.is_file():
-        data = json.loads(cache_file.read_text())
+        data = json.loads(cache_file.read_text(encoding="utf-8"))
         if data.get("stamp") == stamp:
             return data["libs"]
     libs = {p.stem: _index_lib(p) for p in _sym_files()}
-    cache_file.write_text(json.dumps({"stamp": stamp, "libs": libs}))
+    cache_file.write_text(json.dumps({"stamp": stamp, "libs": libs}), encoding="utf-8", newline="\n")
     return libs
 
 

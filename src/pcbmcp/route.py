@@ -91,7 +91,7 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
         updates: queue.Queue = queue.Queue()
         prog = Progress(lambda msg, n: updates.put((msg, n)))
         t0 = time.monotonic()
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
         reader = threading.Thread(target=lambda: [prog.feed(l) for l in proc.stdout], daemon=True)
         reader.start()
 

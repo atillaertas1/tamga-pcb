@@ -290,11 +290,11 @@ def export_fab(pcb_path: str, out_dir: str = "") -> dict:
             z.write(f, f.name)
 
     t = run_worker("fab_tables", {"pcb": pcb})
-    with open(out / "BOM.csv", "w", newline="") as f:
+    with open(out / "BOM.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["Comment", "Designator", "Footprint", "LCSC Part #"])
         w.writerows(t["bom"])
-    with open(out / "CPL.csv", "w", newline="") as f:
+    with open(out / "CPL.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         w.writerows(t["cpl"])

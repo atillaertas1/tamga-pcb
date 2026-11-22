@@ -45,7 +45,7 @@ def _convert(lcsc: str, out: Path) -> None:
     """easyeda2kicad -> out/x.kicad_sym, out/x.pretty, out/x.3dshapes (ağ). Testlerde monkeypatch edilir."""
     _require_easyeda()
     proc = subprocess.run([sys.executable, "-m", "easyeda2kicad", "--full", f"--lcsc_id={lcsc}",
-                           "--output", str(out / "x")], capture_output=True, text=True, timeout=120)
+                           "--output", str(out / "x")], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if proc.returncode != 0 or not (out / "x.kicad_sym").is_file():
         tail = (proc.stderr or proc.stdout).strip().splitlines()[-3:]
         raise ToolError(f"{lcsc}: easyeda2kicad failed: {' | '.join(tail)}")
@@ -129,7 +129,7 @@ def import_part(lcsc: str, compare_footprint: str = "") -> dict:
             [c for c in new if not (isinstance(c, list) and c and c[0] == "symbol")]
         lib[:] = [c for c in lib if not (isinstance(c, list) and c[:2] == ["symbol", sym[1]])]
         lib.append(sym)
-        dst["sym"].write_text(sexpr.dump(lib) + "\n", encoding="utf-8")
+        dst["sym"].write_text(sexpr.dump(lib) + "\n", encoding="utf-8", newline="\n")
 
         # footprint + 3D model (model yolu mutlak: kütüphane nereden açılırsa açılsın bulunur)
         dst["fp"].mkdir(parents=True, exist_ok=True)
@@ -140,7 +140,7 @@ def import_part(lcsc: str, compare_footprint: str = "") -> dict:
             for src in (t / "x.3dshapes").glob(Path(name).stem + ".*"):  # .wrl + .step
                 shutil.copy2(src, dst["3d"] / src.name)
             m[1] = str(dst["3d"] / name)
-        (dst["fp"] / mod.name).write_text(sexpr.dump(fp_tree) + "\n", encoding="utf-8")
+        (dst["fp"] / mod.name).write_text(sexpr.dump(fp_tree) + "\n", encoding="utf-8", newline="\n")
 
     library._lib_tree.cache_clear()
     lib_id, fid = f"{LIB}:{sym[1]}", f"{LIB}:{fp_name}"

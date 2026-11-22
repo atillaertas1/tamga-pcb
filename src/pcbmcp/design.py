@@ -52,7 +52,7 @@ def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
             continue
         f = d / table
         S = sexpr.Sym
-        tree = sexpr.parse(f.read_text()) if f.is_file() else \
+        tree = sexpr.parse(f.read_text(encoding="utf-8")) if f.is_file() else \
             [S(table.replace("-", "_")), [S("version"), 7]]
         have = {str(sexpr.value(e, "name")): e for e in sexpr.children(tree, "lib")}
         changed = False
@@ -69,7 +69,7 @@ def ensure_lib_tables(d: Path, spec: dict) -> list[str]:
             changed = True
             added.append(f"{table}:{lib}")
         if changed:
-            f.write_text(sexpr.dump(tree) + "\n")
+            f.write_text(sexpr.dump(tree) + "\n", encoding="utf-8", newline="\n")
     return added
 
 
@@ -77,7 +77,7 @@ def _dru_mentions(d: Path, nets: list[str]) -> list[str]:
     """Projedeki .kicad_dru dosyalarında bu net adlarına uyan tırnaklı desenler ('IC?P' gibi)."""
     hits = []
     for f in d.glob("*.kicad_dru"):
-        pats = set(re.findall(r"NetName\s*==\s*'([^']+)'", f.read_text()))
+        pats = set(re.findall(r"NetName\s*==\s*'([^']+)'", f.read_text(encoding="utf-8")))
         for n in nets:
             if m := [pt for pt in pats if fnmatch.fnmatchcase(n, pt)]:
                 hits.append(f"{n} ~ {m[0]} ({f.name})")
@@ -86,7 +86,7 @@ def _dru_mentions(d: Path, nets: list[str]) -> list[str]:
 
 def load_spec(project_dir: str, name: str) -> dict | None:
     p = _paths(project_dir, name)["spec"]
-    return json.loads(p.read_text()) if p.is_file() else None
+    return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
 
 
 def apply_patch(spec: dict, patch: dict) -> dict:
@@ -132,7 +132,7 @@ def apply_patch(spec: dict, patch: dict) -> dict:
 def _netlist(sch: Path, tmp: str) -> dict[str, list[tuple[str, str]]]:
     out = f"{tmp}/n.net"
     cli("sch", "export", "netlist", "-o", out, str(sch))
-    tree = sexpr.parse(Path(out).read_text())
+    tree = sexpr.parse(Path(out).read_text(encoding="utf-8"))
     nets = {}
     for n in sexpr.children(sexpr.child(tree, "nets"), "net"):
         nets[str(sexpr.value(n, "name"))] = [(str(sexpr.value(x, "ref")), str(sexpr.value(x, "pin")))
@@ -191,13 +191,13 @@ def sync(project_dir: str, name: str, spec: dict | None, patch: dict | None) -> 
                     issues.append(f"symbol-only pins {res['symbol_only']}")
                 pinout_warnings.append(f"{p['ref']} ({p['lcsc']} {res['part']}): " + "; ".join(issues))
 
-    paths["spec"].write_text(json.dumps(source, indent=1, ensure_ascii=False) + "\n")
-    paths["sch"].write_text(text)
+    paths["spec"].write_text(json.dumps(source, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    paths["sch"].write_text(text, encoding="utf-8", newline="\n")
     # blok instance sayfaları; artık kullanılmayan (bizim ürettiğimiz) sayfaları sil
     for fname, page_text in meta["pages"].items():
-        (paths["dir"] / fname).write_text(page_text)
+        (paths["dir"] / fname).write_text(page_text, encoding="utf-8", newline="\n")
     for old in paths["dir"].glob(f"{name}-*.kicad_sch"):
-        if old.name not in meta["pages"] and '(generator "pcbmcp")' in old.read_text()[:300]:
+        if old.name not in meta["pages"] and '(generator "pcbmcp")' in old.read_text(encoding="utf-8")[:300]:
             old.unlink()
     libs_added = ensure_lib_tables(paths["dir"], spec)
 
