@@ -1,59 +1,53 @@
-# pcbmcp — AI destekli KiCad PCB tasarımı (MCP)
+# pcbmcp — AI-assisted KiCad PCB design over MCP
 
-Claude Code'un (veya herhangi bir MCP istemcisinin) KiCad kartlarını **token-verimli** biçimde
-okuyup düzenlemesini, rotalamasını, doğrulamasını ve üretime çıkarmasını sağlayan MCP sunucusu.
+[Türkçe](README.tr.md) · MIT licensed
 
-## Mimari
+An MCP server that lets Claude Code (or any MCP client) design, place, route, check and export
+KiCad boards **token-efficiently**: from a short JSON circuit description to a DRC-clean board and a
+JLCPCB fabrication package.
 
 ```
-Claude Code ──MCP/stdio──> pcbmcp (uv venv, mcp 2.x)
-                            ├── kicad-cli        : DRC, ERC, gerber/drill, render, Altium import
-                            ├── worker.py (alt süreç, /usr/bin/python3 + pcbnew SWIG)
-                            │     summary, footprint, place, zone, fields, DSN/SES, BOM/CPL
-                            ├── Freerouting jar  : GUI'siz autoroute (DSN → SES)
-                            └── jlcsearch API    : JLCPCB/LCSC stok + fiyat (key gerekmez)
+> Make a 20x15 mm board: 5 V input header, 330 Ω resistor and a green 0805 LED.
+  Place it, route it, pour GND, get DRC clean and export the JLCPCB package.
 ```
 
-Neden böyle:
-- **pcbnew alt süreçte**: modül sistem Python'unda yaşıyor ve segfault atabiliyor; sunucu ölmüyor.
-- **kicad-cli 10'da DSN export yok** → Freerouting köprüsü pcbnew `ExportSpecctraDSN/ImportSpecctraSES` ile.
-- **IPC API (kipy) yerine dosya tabanlı**: KiCad GUI açık olmadan çalışır, CI'da da koşar.
-  Canlı GUI düzenleme istenirse sonraki adım kipy backend'i.
+## Requirements
+- **KiCad 10** (provides `kicad-cli` and the `pcbnew` Python module)
+- **[uv](https://docs.astral.sh/uv/)** (Python 3.11+)
+- **Java 25+** for autorouting (Freerouting), optional
 
-## Token verimliliği
-| Önlem | Etki |
-|---|---|
-| 20 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
-| Ham `.kicad_pcb` yok; footprint başına 1 satır | 7 parçalı kart özeti ≈ 900 karakter |
-| DRC/ERC türe göre gruplu, 3 örnek konum | 300 ihlal → ~1 KB |
-| Parça başına 1 satır, basic önce | 20 sonuç yerine 8 satır |
-| Kurallar/checklist skill'de | sadece PCB işinde bağlama yüklenir |
+Linux, macOS and Windows. KiCad is located automatically (`/usr/share/kicad`, `KiCad.app`,
+`%ProgramFiles%\KiCad\<version>`). Linux is the most tested platform; on macOS/Windows please run
+`pcbmcp doctor` and open an issue if something is not found.
 
-## Araçlar
-**Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
-
-**Kart:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
-`fill_zones`, `route_net`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
-`import_board` (Altium `.PcbDoc`, Eagle, PADS, CADSTAR...).
-
-## Kurulum
+## Install
 ```bash
-cd ~/Documents/Personal/pcb-deneme
-uv sync
-uv run pcbmcp doctor --fix   # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir (v2.5.0, Java 25+)
-uv run pytest -q          # 60 test, KiCad 10 gerekir (autoroute testleri jar varsa koşar)
+git clone <repo-url> pcbmcp && cd pcbmcp
+uv sync                       # add --extra lcsc to import parts from LCSC/EasyEDA
+uv run pcbmcp doctor --fix    # checks KiCad, pcbnew, Java; downloads Freerouting if missing
 ```
-Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
-Başka projelerde kullanmak için: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp`.
 
-## Örnek oturum
-```
-> examples/ldo/ldo.kicad_pcb kartını yerleştir, rotala, GND dök, DRC temiz olsun, JLC paketi çıkar.
-```
-Test kartı: `/usr/bin/python3 scripts/make_example_board.py examples/ldo/ldo.kicad_pcb`
+**Use it in this folder:** run `claude` here. `.mcp.json` starts the server and
+`.claude/skills/pcb-design` loads the design workflow and JLCPCB rules.
 
-## Sıfırdan tasarım: devre tanımı → şematik + PCB
-Tek doğruluk kaynağı `<name>.circuit.json`:
+**Use it in your own projects:**
+```bash
+claude mcp add pcbmcp -- uv run --directory /path/to/pcbmcp pcbmcp
+cp -r /path/to/pcbmcp/.claude/skills/pcb-design ~/.claude/skills/   # workflow + checklist
+```
+
+If detection fails, set any of `PCBMCP_KICAD_CLI`, `PCBMCP_KICAD_PYTHON` (KiCad's own Python, the one that
+can `import pcbnew`), `PCBMCP_SYMBOL_DIR`, `PCBMCP_FOOTPRINT_DIR`, `PCBMCP_JAVA`, `FREEROUTING_JAR`.
+
+## Tools
+**Design:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
+
+**Board:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`,
+`add_copper_zone`, `fill_zones`, `route_net`, `autoroute`, `run_drc`, `run_erc`, `render_board`,
+`search_parts`, `export_fab`, `import_board` (Altium `.PcbDoc`, Eagle, PADS, CADSTAR…)
+
+## Design from a spec
+The single source of truth is `<name>.circuit.json`:
 ```json
 {"title": "LED", "board": {"width_mm": 20, "height_mm": 15},
  "parts": [
@@ -65,48 +59,50 @@ Tek doğruluk kaynağı `<name>.circuit.json`:
   {"ref": "D1", "symbol": "Device:LED", "value": "GREEN",
    "footprint": "LED_SMD:LED_0805_2012Metric", "pins": {"A": "LED_A", "K": "GND"}}]}
 ```
-`sync_design` bundan şunları yapar:
-1. `.kicad_sch` üretir: pin uçlarına tel + global label, deterministik UUID'ler,
-   çok birimli semboller (LM358 vb.), `extends` ile türetilmiş semboller düzleştirilir,
-   gerekli `PWR_FLAG`'ler otomatik.
-2. `kicad-cli` ile netlist çıkarır ve spec ile karşılaştırır (`netlist_check`).
-3. PCB'yi netlist'ten günceller (KiCad'in F8'i gibi): ekle / footprint değiştir / sil,
-   **mevcut yerleşimi korur**, footprint'leri sembollere bağlar.
-4. ERC + şematik↔PCB parity kontrolü.
+`sync_design` then:
+1. writes the `.kicad_sch` (deterministic UUIDs, multi-unit symbols, power symbols, `PWR_FLAG`s);
+2. exports the netlist with `kicad-cli` and checks it against the spec;
+3. updates the PCB from the netlist like KiCad's F8, **keeping existing placement**;
+4. runs ERC and a schematic↔PCB parity check.
 
-Pin anahtarı numara (`"1"`) veya ad (`"A"`, `"VI"`) olabilir. Yanlış pin adında hiçbir dosya
-yazılmaz, mevcut pinler listelenir. Düzenleme için `patch={parts:[{ref:"R1", value:"470"}], remove:["C1"]}`.
+Pins can be keyed by number (`"1"`) or name (`"A"`). A wrong pin name or a missing pad writes nothing
+and lists the valid pins. Edits go through `patch={parts:[{ref:"R1", value:"470"}], remove:["C1"]}`.
+Parts with an `lcsc` number are checked against the real LCSC pinout.
 
-Doğrulama: her senkronda pin↔pad numara kontrolü (eksik pad = hiçbir dosya yazılmaz) ve
-`lcsc` olan parçalarda sembol pinout'u ↔ gerçek LCSC parçası (EasyEDA verisi, uyarı olarak).
-Stok olmayan kütüphaneler (`pcbmcp_custom`, `pcbmcp_lcsc`) projenin `sym-lib-table`/`fp-lib-table`'ına
-otomatik eklenir.
+**Circuit blocks:** define a repeated sub-circuit once in `blocks` and use it from `instances`; each instance
+gets its own schematic sheet, stable refs (`ref_base` / `refs`) and prefixed nets.
 
-KiCad'de olmayan parça: `import_lcsc_part("C597931")` → `symbols/pcbmcp_lcsc.kicad_sym`,
-`footprints/pcbmcp_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
-footprint'i varsa pad numaralandırması karşılaştırılır (ör. Hirose DF40'ta EasyEDA U-numaralı,
-KiCad tek/çift → 100/100 pad farklı; uyarı verir).
+**Parts not in KiCad:** `import_lcsc_part("C597931")` (needs the `lcsc` extra) converts the EasyEDA part
+into the `pcbmcp_lcsc` library in your data directory and compares its pad numbering with KiCad's
+footprint when one exists. Non-stock libraries are copied into `<project>/lib/`, so a project folder is
+self-contained and can be shared as is.
 
-**Devre blokları** (tekrar eden alt devreler): `blocks` bir kez tanımlanır, `instances` ile kullanılır.
-Port eşlenmezse aynı adlı global nete bağlanır; diğer netler `<net_prefix><net>` olur (varsayılan
-`<ad>_`). Ref'ler `ref_base` (U1→U101) ya da `refs` ile sabit — bloğa parça eklemek diğer instance'ların
-ref'lerini, dolayısıyla PCB yerleşimini kaydırmaz. Mevcut tasarımı bloklara taşırken `refs` + `net_prefix`
-ile eski ref ve net adları korunur: cm3-carrier'daki iki MAX3232 bloklaştırıldığında netlist, PCB ve DRC
-birebir aynı kaldı. Net adı değişirse `nets_gone` raporlanır; `.kicad_dru`'da o ada bakan kural varsa
-`dru_rules_reference_gone_nets` uyarır (bağlantı doğru olsa da kural sessizce devre dışı kalır).
+## Why it is built this way
+| Choice | Reason |
+|---|---|
+| `pcbnew` runs in a worker subprocess | it lives in KiCad's Python and can segfault; the server survives |
+| File based, not KiCad's IPC API | works without the GUI, and in CI |
+| Freerouting via pcbnew DSN/SES | `kicad-cli` 10 has no DSN export |
+| 20 tools, one-line results | tool schemas ≈ 2.4k tokens; a 7-part board summary ≈ 900 chars; 300 DRC violations → ~1 KB |
+| Rules and checklist in a skill | loaded into context only for PCB work |
 
-Her blok instance'ı kendi şematik sayfasına gider (`<ad>-<instance>.kicad_sch`); kök sayfada sheet kutusu
-ve port eşlemesi yazılır. Bağlantı global label ile kalır, net adları hiyerarşiden etkilenmez.
+## Development
+```bash
+uv sync --extra lcsc
+uv run pytest -q   # KiCad-dependent tests are skipped when KiCad is not installed
+```
+Example board: `<KiCad Python> scripts/make_example_board.py examples/ldo/ldo.kicad_pcb`
 
-Sınırlar: sheet kutularında hiyerarşik pin yok (portlar yazı olarak); şematik okunur ama "label stili" (tel çizimi yok);
-`.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.
+## Roadmap
+- [ ] kipy (IPC) backend for live editing in an open KiCad
+- [ ] Hierarchical pins on sheet symbols
+- [ ] Alternative routers (DeepPCB / Quilter)
+- [ ] ngspice simulation of analog blocks
 
-## Yol haritası
-- [ ] kipy (IPC) backend: açık KiCad'de canlı düzenleme
-- [x] Netclass yönetimi (güç netleri için geniş iz) — `set_netclass`
-- [x] Şematik üretimi (spec → .kicad_sch + PCB senkronu)
-- [x] Devre blokları + hiyerarşik sheet'ler
-- [ ] Güç sembolleri, sheet kutularında hiyerarşik pinler
-- [x] Kritik net için `route_net` (elle yön verilen, kilitli rota; autoroute dokunmaz)
-- [ ] DeepPCB/Quilter API alternatif router
-- [ ] ngspice ile analog blok simülasyonu
+## License
+MIT, see [LICENSE](LICENSE). **The schematics, boards and fabrication files you make are entirely yours**;
+no tool's license carries over to its output.
+
+Optional components are installed separately under their own licenses: easyeda2kicad (AGPL-3.0, the `lcsc`
+extra, run as a separate process) and Freerouting (GPL-3.0, a separate jar fetched by `doctor --fix`).
+KiCad itself is GPL-3.0.
