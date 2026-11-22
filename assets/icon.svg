@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512" role="img" aria-label="tamga">
+  <rect width="128" height="128" rx="26" fill="#1d3a2a"/>
+  <g transform="translate(17.2,13.3) scale(0.78)">
+  <g fill="none" stroke="#c47a3a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M60 104 V62 L36 38 V26 M60 62 L84 38 V26 M60 62 V30"/>
+    <path d="M44 86 H76"/>
+  </g>
+  <g fill="#c47a3a">
+    <circle cx="36" cy="18" r="11"/><circle cx="84" cy="18" r="11"/><circle cx="60" cy="22" r="11"/><circle cx="60" cy="112" r="11"/>
+  </g>
+  <g fill="#1d3a2a">
+    <circle cx="36" cy="18" r="4.5"/><circle cx="84" cy="18" r="4.5"/><circle cx="60" cy="22" r="4.5"/><circle cx="60" cy="112" r="4.5"/>
+  </g>
+  </g>
+</svg>

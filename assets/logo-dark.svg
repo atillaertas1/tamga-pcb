@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -2 448 140" width="448" height="140" role="img" aria-label="tamga">
+  <g fill="none" stroke="#d9894a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M60 104 V62 L36 38 V26 M60 62 L84 38 V26 M60 62 V30"/>
+    <path d="M44 86 H76"/>
+  </g>
+  <g fill="#d9894a">
+    <circle cx="36" cy="18" r="11"/><circle cx="84" cy="18" r="11"/><circle cx="60" cy="22" r="11"/><circle cx="60" cy="112" r="11"/>
+  </g>
+  <g fill="#0d1117">
+    <circle cx="36" cy="18" r="4.5"/><circle cx="84" cy="18" r="4.5"/><circle cx="60" cy="22" r="4.5"/><circle cx="60" cy="112" r="4.5"/>
+  </g>
+  <g transform="translate(150,0)" fill="none" stroke="#ece6da" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 32 V86 Q12 100 27 100"/><path d="M0 52 H28"/>
+    <ellipse cx="62" cy="76" rx="20" ry="24"/><path d="M82 52 V100"/>
+    <path d="M104 100 V64 Q104 52 118 52 Q132 52 132 64 V100 M132 64 Q132 52 146 52 Q160 52 160 64 V100"/>
+    <ellipse cx="196" cy="76" rx="20" ry="24"/><path d="M216 52 V112 Q216 126 200 126 H186"/>
+    <ellipse cx="256" cy="76" rx="20" ry="24"/><path d="M276 52 V100"/>
+  </g>
+</svg>

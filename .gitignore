@@ -11,3 +11,5 @@ tools/*.jar
 fp-info-cache
 ~*.lck
 projects/
+!assets/**/*.png
+!.claude-plugin/icon.png

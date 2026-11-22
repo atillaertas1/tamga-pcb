@@ -1,138 +1,166 @@
-# tamga-pcb — AI destekli KiCad PCB tasarımı (MCP)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg" />
+    <img src="assets/logo-light.svg" alt="tamga" width="320" />
+  </picture>
+</p>
 
-[English](README.md) · MIT lisansı
+<p align="center"><b>Devreyi anlat. Rotalanmış, DRC temiz bir KiCad kartı ve JLCPCB siparişi al.</b></p>
 
-Adını Türk boylarının taşa, madene ve sikkelere vurduğu *tamga*dan alır: bir yüzeye kalıcı olarak
-basılan işaret, tıpkı bakıra işlenen bir devre gibi.
+<p align="center">
+  <a href="https://github.com/atillaertas1/tamga-pcb/actions/workflows/ci.yml"><img src="https://github.com/atillaertas1/tamga-pcb/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  &nbsp;
+  <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-MIT-24292f?style=flat" alt="MIT lisansı" /></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/KiCad-10-314cb0?style=flat" alt="KiCad 10" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-24292f?style=flat" alt="Linux, macOS, Windows" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Claude%20Code-plugin-c47a3a?style=flat" alt="Claude Code plugin" />
+  &nbsp;
+  <a href="README.md"><img src="https://img.shields.io/badge/English-read-24292f?style=flat" alt="English" /></a>
+</p>
 
-Claude Code'un (veya herhangi bir MCP istemcisinin) KiCad kartlarını **token-verimli** biçimde
-okuyup düzenlemesini, rotalamasını, doğrulamasını ve üretime çıkarmasını sağlayan MCP sunucusu.
+<p align="center">
+  <img src="assets/examples/esp32c3-3d.png" alt="ESP32-C3 USB-C geliştirme kartının 3D görüntüsü" width="88%" />
+</p>
+<p align="center"><sub>USB-C, 3.3 V regülatör, reset/boot butonları ve GPIO header'lı bir ESP32-C3 kartı: şematik, yerleşim,
+rota, GND dökümü, DRC ve üretim dosyaları tamamen tamga-pcb araçlarıyla yapıldı.
+<a href="examples/esp32c3-devboard">Kendin yeniden üret</a>.</sub></p>
 
-## Mimari
+**tamga-pcb**, KiCad iş akışının tamamını Claude Code'a 20 sade araç olarak verir. Kartı düz cümlelerle
+anlatırsın; Claude kısa bir devre tanımı yazar, tamga-pcb bundan şematik ve PCB üretir, parçaları yerleştirir,
+Freerouting ile rotalar, GND döker, DRC temiz çıkana kadar döner ve JLCPCB için Gerber, BOM ve dizgi dosyasını
+çıkarır. Yol boyunca her LCSC parçası gerçek pin dizilimiyle karşılaştırılır; Claude ham KiCad dosyası okumaz,
+araçlar tek satırlık özetlerle cevap verir.
 
 ```
-Claude Code ──MCP/stdio──> tamga-pcb (uv venv, mcp 2.x)
-                            ├── kicad-cli        : DRC, ERC, gerber/drill, render, Altium import
-                            ├── worker.py (alt süreç, KiCad'in Python'u + pcbnew SWIG)
-                            │     summary, footprint, place, zone, fields, DSN/SES, BOM/CPL
-                            ├── Freerouting jar  : GUI'siz autoroute (DSN → SES)
-                            └── jlcsearch API    : JLCPCB/LCSC stok + fiyat (key gerekmez)
+> USB-C'den beslenen, reset ve boot butonlu, kullanıcı LED'li ve GPIO header'lı bir ESP32-C3 kartı yap.
+  60 x 32 mm'yi geçmesin, JLCPCB'ye hazır olsun.
 ```
-
-Neden böyle:
-- **pcbnew alt süreçte**: modül sistem Python'unda yaşıyor ve segfault atabiliyor; sunucu ölmüyor.
-- **kicad-cli 10'da DSN export yok** → Freerouting köprüsü pcbnew `ExportSpecctraDSN/ImportSpecctraSES` ile.
-- **IPC API (kipy) yerine dosya tabanlı**: KiCad GUI açık olmadan çalışır, CI'da da koşar.
-  Canlı GUI düzenleme istenirse sonraki adım kipy backend'i.
-
-## Token verimliliği
-| Önlem | Etki |
-|---|---|
-| 20 araç, kısa açıklamalar | araç şemaları ≈ 2.4k token (hazır sunucularda 64-216 araç) |
-| Ham `.kicad_pcb` yok; footprint başına 1 satır | 7 parçalı kart özeti ≈ 900 karakter |
-| DRC/ERC türe göre gruplu, 3 örnek konum | 300 ihlal → ~1 KB |
-| Parça başına 1 satır, basic önce | 20 sonuç yerine 8 satır |
-| Kurallar/checklist skill'de | sadece PCB işinde bağlama yüklenir |
-
-## Araçlar
-**Tasarım:** `find_symbol`, `get_symbol`, `find_footprint`, `import_lcsc_part`, `sync_design`
-
-**Kart:** `board_summary`, `get_footprint`, `place_footprints`, `set_netclass`, `set_footprint_fields`, `add_copper_zone`,
-`fill_zones`, `route_net`, `autoroute`, `run_drc`, `run_erc`, `render_board`, `search_parts`, `export_fab`,
-`import_board` (Altium `.PcbDoc`, Eagle, PADS, CADSTAR...).
 
 ## Kurulum
-Gerekenler: KiCad 10, [uv](https://docs.astral.sh/uv/), autoroute için Java 25+. Linux, macOS ve Windows;
-KiCad yolları otomatik bulunur, `TAMGA_KICAD_CLI`, `TAMGA_KICAD_PYTHON`, `TAMGA_SYMBOL_DIR`,
-`TAMGA_FOOTPRINT_DIR` ile ezilebilir.
-Claude Code plugin'i olarak (Claude Code içinde):
+
+Claude Code içinde:
+
 ```
 /plugin install tamga-pcb --marketplace atillaertas1/tamga-pcb
 ```
-Eski sürümlerde: `/plugin marketplace add atillaertas1/tamga-pcb`, sonra `/plugin install tamga-pcb@tamga-pcb`.
-Plugin MCP sunucusunu ve `pcb-design` skill'ini getirir; her proje klasöründe çalışır. İlk açılışta `uv`
-ortamı kurar, ilk `autoroute` Freerouting'i indirir.
 
-Geliştirme:
+Gerekenler: **[KiCad 10](https://www.kicad.org/download/)** ve **[uv](https://docs.astral.sh/uv/)**; autoroute için
+**Java 25+**. tamga-pcb KiCad'i Linux, macOS ve Windows'ta kendisi bulur, ilk açılışta Python ortamını kurar ve ilk
+rotada Freerouting'i indirir. API anahtarı gerekmez.
+
+<details>
+<summary>Eski Claude Code sürümleri</summary>
+
+```
+/plugin marketplace add atillaertas1/tamga-pcb
+/plugin install tamga-pcb@tamga-pcb
+```
+
+</details>
+
+<details>
+<summary>Başka MCP istemcileri</summary>
+
+Repoyu klonla ve bunu stdio sunucusu olarak ekle:
+
 ```bash
-git clone https://github.com/atillaertas1/tamga-pcb tamga-pcb && cd tamga-pcb
+uv run --directory /yol/tamga-pcb --extra lcsc tamga
+```
+
+Plugin'in skill olarak yüklediği iş akışı [`skills/pcb-design/SKILL.md`](skills/pcb-design/SKILL.md) dosyasında;
+agent'ına talimat olarak ver.
+
+</details>
+
+<details>
+<summary>Bir şey bulunamadı mı?</summary>
+
+Claude'a *tamga doctor'ı çalıştır* de. KiCad'i, Python'unu, kütüphaneleri, Java'yı ve ağı kontrol eder; bulamadığı
+her şey için ayarlanacak ortam değişkenini söyler: `TAMGA_KICAD_CLI`, `TAMGA_KICAD_PYTHON`, `TAMGA_SYMBOL_DIR`,
+`TAMGA_FOOTPRINT_DIR`, `TAMGA_JAVA`, `FREEROUTING_JAR`.
+
+</details>
+
+## Tanımdan karta
+
+Tek doğruluk kaynağı kısa bir `<ad>.circuit.json`: parçalar, footprint'ler, LCSC kodları ve her pinin bağlandığı net.
+Claude yazar, gerisini tamga-pcb yapar.
+
+```json
+{"ref": "U2", "symbol": "RF_Module:ESP32-C3-WROOM-02", "lcsc": "C2934560",
+ "footprint": "RF_Module:ESP32-C3-WROOM-02", "sheet": "MCU",
+ "pins": {"1": "+3V3", "2": "EN", "13": "USB_DN", "14": "USB_DP", "9": "GND"}}
+```
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/examples/esp32c3-schematic/esp32c3-MCU.png" alt="ESP32-C3 modülü için üretilen şematik sayfası" /></td>
+    <td width="50%"><img src="assets/examples/esp32c3-routed.png" alt="ESP32-C3 kartının otomatik rotası; üst katman kırmızı, alt katman mavi" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Üretilen şematik, her işlev ayrı sayfada</sub></td>
+    <td align="center"><sub>GND dökümünden önce otomatik rota</sub></td>
+  </tr>
+</table>
+
+## Nasıl çalışır
+
+1. **Tanım → şematik.** `sync_design` `.kicad_sch` yazar (işlevsel sayfalar, güç sembolleri, notlar, deterministik
+   UUID'ler), `kicad-cli` ile netlist çıkarıp tanımla karşılaştırır. Yanlış pin adı ya da eksik pad'de hiçbir dosya
+   yazılmaz, geçerli pinler listelenir.
+2. **Gerçek parçayı kontrol et.** Her LCSC kodu parçanın EasyEDA pin dizilimiyle karşılaştırılır. Ters LED ya da yanlış
+   sembol varyantı dizilmiş kartta değil, burada ortaya çıkar.
+3. **Şematik → PCB.** Kart, KiCad'in *Update PCB*'si gibi netlist'ten güncellenir, yerleşim korunur; ardından ERC ve
+   şematik↔PCB uyum kontrolü.
+4. **Yerleştir ve rotala.** Claude parçaları tek seferde yerleştirir, güç netlerini netclass ile genişletir, kritik
+   netleri `route_net` ile elle (kilitli) çizer, gerisini Freerouting GUI'siz rotalar.
+5. **Dök ve doğrula.** Stitching via'lı iki katman GND dökümü, sonra `run_drc` `CLEAN` diyene kadar; ihlaller türe göre
+   gruplu ve konumlu gelir.
+6. **Sipariş.** `export_fab` Gerber, delik dosyaları, BOM ve CPL'yi JLCPCB biçiminde yazar, LCSC kodu olmayanları listeler.
+
+[pcb-design skill'i](skills/pcb-design/SKILL.md) döngüyü, yerleşim kontrol listesini ve JLCPCB sınırlarını taşır;
+Claude her seferinde aynı adımları izler.
+
+## Araçlar
+
+| Araç | Ne yapar |
+| --- | --- |
+| `sync_design` | Tanım → şematik + PCB, netlist ve pinout kontrolü, ERC, uyum. Düzenlemeler küçük yamalarla. |
+| `find_symbol`, `get_symbol`, `find_footprint` | KiCad kütüphanelerinde arar; pin adlarını ve pad eşleşmesini doğrular. |
+| `search_parts`, `import_lcsc_part` | JLCPCB/LCSC stok ve fiyat, önce basic parçalar; KiCad'de olmayan parçayı getirir. |
+| `board_summary`, `get_footprint` | Footprint ve net başına tek satır, pad konumları. Bağlama ham `.kicad_pcb` girmez. |
+| `place_footprints` | Birçok footprint'i tek çağrıda taşır, döndürür, çevirir. |
+| `set_netclass`, `route_net` | Net sınıfına göre iz genişliği; kritik netler için yönlendirilmiş, kilitli rota. |
+| `autoroute` | GUI'siz Freerouting; ilerleme bildirir, zaman aşımında nerede kaldığını söyler. |
+| `add_copper_zone`, `fill_zones` | Stitching via'lı GND dökümü. |
+| `run_drc`, `run_erc` | İhlaller türe göre gruplu, örnek konumlu: 300 ihlal ~1 KB. |
+| `render_board` | Görsel kontrol için kartın PNG'si. |
+| `export_fab` | JLCPCB için Gerber, delik, BOM ve CPL. |
+| `import_board` | Altium, Eagle, PADS ya da CADSTAR kartlarını içe aktarır. |
+
+## Geliştirme
+
+```bash
+git clone https://github.com/atillaertas1/tamga-pcb && cd tamga-pcb
 uv sync --extra lcsc
 uv run tamga doctor          # KiCad/pcbnew/Java kontrolü (--fix: Freerouting'i şimdi indir)
-uv run pytest -q              # KiCad gerektiren testler KiCad yoksa atlanır
-claude --plugin-dir .         # çalışma kopyasını plugin olarak yükle
+uv run pytest -q             # KiCad gerektiren testler KiCad yoksa atlanır
+claude --plugin-dir .        # çalışma kopyasını plugin olarak yükle
 ```
 
-İçe aktarılan parçalar ve Freerouting jar kullanıcı veri dizininde durur (`tamga doctor` gösterir;
-`TAMGA_DATA_DIR` ile değişir). Stok olmayan kütüphaneler projenin `lib/` klasörüne kopyalanır, proje
-tek başına taşınabilir.
+Örnek kart `uv run python examples/esp32c3-devboard/build.py` ile baştan sona yeniden üretilir. Değişiklikler
+[changelog](CHANGELOG.md)'da.
 
-## Örnek oturum
-```
-> examples/ldo/ldo.kicad_pcb kartını yerleştir, rotala, GND dök, DRC temiz olsun, JLC paketi çıkar.
-```
-Test kartı: `<KiCad Python'u> scripts/make_example_board.py examples/ldo/ldo.kicad_pcb`
+## Ad
 
-## Sıfırdan tasarım: devre tanımı → şematik + PCB
-Tek doğruluk kaynağı `<name>.circuit.json`:
-```json
-{"title": "LED", "board": {"width_mm": 20, "height_mm": 15},
- "parts": [
-  {"ref": "J1", "symbol": "Connector_Generic:Conn_01x02", "value": "5V IN",
-   "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
-   "pins": {"1": "+5V", "2": "GND"}},
-  {"ref": "R1", "symbol": "Device:R", "value": "330", "lcsc": "C17630",
-   "footprint": "Resistor_SMD:R_0805_2012Metric", "pins": {"1": "+5V", "2": "LED_A"}},
-  {"ref": "D1", "symbol": "Device:LED", "value": "GREEN",
-   "footprint": "LED_SMD:LED_0805_2012Metric", "pins": {"A": "LED_A", "K": "GND"}}]}
-```
-`sync_design` bundan şunları yapar:
-1. `.kicad_sch` üretir: pin uçlarına tel + global label, deterministik UUID'ler,
-   çok birimli semboller (LM358 vb.), `extends` ile türetilmiş semboller düzleştirilir,
-   gerekli `PWR_FLAG`'ler otomatik.
-2. `kicad-cli` ile netlist çıkarır ve spec ile karşılaştırır (`netlist_check`).
-3. PCB'yi netlist'ten günceller (KiCad'in F8'i gibi): ekle / footprint değiştir / sil,
-   **mevcut yerleşimi korur**, footprint'leri sembollere bağlar.
-4. ERC + şematik↔PCB parity kontrolü.
-
-Pin anahtarı numara (`"1"`) veya ad (`"A"`, `"VI"`) olabilir. Yanlış pin adında hiçbir dosya
-yazılmaz, mevcut pinler listelenir. Düzenleme için `patch={parts:[{ref:"R1", value:"470"}], remove:["C1"]}`.
-
-Doğrulama: her senkronda pin↔pad numara kontrolü (eksik pad = hiçbir dosya yazılmaz) ve
-`lcsc` olan parçalarda sembol pinout'u ↔ gerçek LCSC parçası (EasyEDA verisi, uyarı olarak).
-Stok olmayan kütüphaneler (`tamga_custom`, `tamga_lcsc`) projenin `lib/` klasörüne kopyalanır ve
-`sym-lib-table`/`fp-lib-table`'a `${KIPRJMOD}/lib/...` olarak otomatik eklenir.
-
-KiCad'de olmayan parça (`[lcsc]` extra'sı gerekir): `import_lcsc_part("C597931")` → veri dizininde
-`symbols/tamga_lcsc.kicad_sym`, `footprints/tamga_lcsc.pretty` (easyeda2kicad + `kicad-cli upgrade`). KiCad'de aynı parçanın
-footprint'i varsa pad numaralandırması karşılaştırılır (ör. Hirose DF40'ta EasyEDA U-numaralı,
-KiCad tek/çift → 100/100 pad farklı; uyarı verir).
-
-**Devre blokları** (tekrar eden alt devreler): `blocks` bir kez tanımlanır, `instances` ile kullanılır.
-Port eşlenmezse aynı adlı global nete bağlanır; diğer netler `<net_prefix><net>` olur (varsayılan
-`<ad>_`). Ref'ler `ref_base` (U1→U101) ya da `refs` ile sabit — bloğa parça eklemek diğer instance'ların
-ref'lerini, dolayısıyla PCB yerleşimini kaydırmaz. Mevcut tasarımı bloklara taşırken `refs` + `net_prefix`
-ile eski ref ve net adları korunur: iki MAX3232'li bir kart bloklaştırıldığında netlist, PCB ve DRC
-birebir aynı kaldı. Net adı değişirse `nets_gone` raporlanır; `.kicad_dru`'da o ada bakan kural varsa
-`dru_rules_reference_gone_nets` uyarır (bağlantı doğru olsa da kural sessizce devre dışı kalır).
-
-Her blok instance'ı kendi şematik sayfasına gider (`<ad>-<instance>.kicad_sch`); kök sayfada sheet kutusu
-ve port eşlemesi yazılır. Bağlantı global label ile kalır, net adları hiyerarşiden etkilenmez.
-
-Sınırlar: sheet kutularında hiyerarşik pin yok (portlar yazı olarak); şematik okunur ama "label stili" (tel çizimi yok);
-`.kicad_sch` elle düzenlenirse sonraki senkronda ezilir.
-
-## Yol haritası
-- [ ] kipy (IPC) backend: açık KiCad'de canlı düzenleme
-- [x] Netclass yönetimi (güç netleri için geniş iz) — `set_netclass`
-- [x] Şematik üretimi (spec → .kicad_sch + PCB senkronu)
-- [x] Devre blokları + hiyerarşik sheet'ler
-- [x] Güç sembolleri
-- [ ] Sheet kutularında hiyerarşik pinler
-- [x] Kritik net için `route_net` (elle yön verilen, kilitli rota; autoroute dokunmaz)
-- [ ] DeepPCB/Quilter API alternatif router
-- [ ] ngspice ile analog blok simülasyonu
+*Tamga*, Türk boylarının taşa, madene ve sikkelere vurduğu damgadır: bir yüzeye kalıcı olarak basılan işaret, tıpkı
+bakıra işlenen bir devre gibi.
 
 ## Lisans
-MIT. Ürettiğiniz şematik, PCB ve üretim dosyaları tamamen sizindir; hiçbir aracın lisansı çıktıya geçmez.
-Opsiyonel bağımlılıklar kendi lisanslarıyla ayrıca kurulur: easyeda2kicad (AGPL-3.0, `[lcsc]` extra'sı,
-ayrı süreç olarak çağrılır), Freerouting (GPL-3.0, ilk kullanımda indirilen ayrı jar). KiCad GPL-3.0.
+
+MIT, bkz. [LICENSE](LICENSE). **Ürettiğin kartlar tamamen senindir**; hiçbir aracın lisansı çıktıya geçmez. Opsiyonel
+parçalar kendi lisanslarıyla ayrıca kurulur: easyeda2kicad (AGPL-3.0, `lcsc` extra'sı, ayrı süreç olarak çağrılır) ve
+Freerouting (GPL-3.0, ilk kullanımda indirilen ayrı jar). KiCad GPL-3.0'dır.

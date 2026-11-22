@@ -1,0 +1,286 @@
+{
+ "title": "ESP32-C3 USB-C dev board",
+ "board": {
+  "width_mm": 60,
+  "height_mm": 32
+ },
+ "sheet_notes": {
+  "Power": "USB-C sink: 5.1k on CC1/CC2 asks the host for 5 V. AMS1117 drops VBUS to 3.3 V.",
+  "MCU": "Native USB: IO18 = D-, IO19 = D+. Strapping: IO9 low at reset = download mode, IO8 and IO2 held high.",
+  "IO": "Header: power, UART and five GPIOs."
+ },
+ "parts": [
+  {
+   "ref": "J1",
+   "symbol": "Connector:USB_C_Receptacle_USB2.0_16P",
+   "value": "USB-C",
+   "lcsc": "C165948",
+   "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+   "sheet": "Power",
+   "pins": {
+    "A4": "VBUS",
+    "A9": "VBUS",
+    "B4": "VBUS",
+    "B9": "VBUS",
+    "A1": "GND",
+    "A12": "GND",
+    "B1": "GND",
+    "B12": "GND",
+    "SH": "GND",
+    "A5": "CC1",
+    "B5": "CC2",
+    "A6": "USB_DP",
+    "B6": "USB_DP",
+    "A7": "USB_DN",
+    "B7": "USB_DN"
+   },
+   "nc": [
+    "A8",
+    "B8"
+   ]
+  },
+  {
+   "ref": "R1",
+   "symbol": "Device:R",
+   "value": "5.1k",
+   "lcsc": "C23186",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "Power",
+   "pins": {
+    "1": "CC1",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R2",
+   "symbol": "Device:R",
+   "value": "5.1k",
+   "lcsc": "C23186",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "Power",
+   "pins": {
+    "1": "CC2",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "U1",
+   "symbol": "Regulator_Linear:AMS1117-3.3",
+   "value": "AMS1117-3.3",
+   "lcsc": "C6186",
+   "footprint": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+   "sheet": "Power",
+   "pins": {
+    "GND": "GND",
+    "VO": "+3V3",
+    "VI": "VBUS"
+   }
+  },
+  {
+   "ref": "C1",
+   "symbol": "Device:C",
+   "value": "10u",
+   "lcsc": "C15850",
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "sheet": "Power",
+   "pins": {
+    "1": "VBUS",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "C2",
+   "symbol": "Device:C",
+   "value": "22u",
+   "lcsc": "C45783",
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "sheet": "Power",
+   "pins": {
+    "1": "+3V3",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R3",
+   "symbol": "Device:R",
+   "value": "1k",
+   "lcsc": "C21190",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "Power",
+   "pins": {
+    "1": "+3V3",
+    "2": "PWR_LED"
+   }
+  },
+  {
+   "ref": "D1",
+   "symbol": "Device:LED",
+   "value": "GREEN",
+   "lcsc": "C72043",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "sheet": "Power",
+   "pins": {
+    "A": "PWR_LED",
+    "K": "GND"
+   }
+  },
+  {
+   "ref": "U2",
+   "symbol": "RF_Module:ESP32-C3-WROOM-02",
+   "value": "ESP32-C3-WROOM-02",
+   "lcsc": "C2934560",
+   "footprint": "RF_Module:ESP32-C3-WROOM-02",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "EN",
+    "3": "IO4",
+    "7": "IO8",
+    "8": "IO9",
+    "9": "GND",
+    "11": "RXD",
+    "12": "TXD",
+    "13": "USB_DN",
+    "14": "USB_DP",
+    "15": "IO3",
+    "16": "IO2",
+    "17": "IO1",
+    "18": "IO0",
+    "19": "GND"
+   },
+   "nc": [
+    "4",
+    "5",
+    "6",
+    "10"
+   ]
+  },
+  {
+   "ref": "C3",
+   "symbol": "Device:C",
+   "value": "100n",
+   "lcsc": "C14663",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R4",
+   "symbol": "Device:R",
+   "value": "10k",
+   "lcsc": "C25804",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "EN"
+   }
+  },
+  {
+   "ref": "C4",
+   "symbol": "Device:C",
+   "value": "1u",
+   "lcsc": "C15849",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "EN",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "SW1",
+   "symbol": "Switch:SW_Push",
+   "value": "RESET",
+   "lcsc": "C318884",
+   "footprint": "Button_Switch_SMD:SW_SPST_TL3342",
+   "sheet": "MCU",
+   "pins": {
+    "1": "EN",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R5",
+   "symbol": "Device:R",
+   "value": "10k",
+   "lcsc": "C25804",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "IO9"
+   }
+  },
+  {
+   "ref": "SW2",
+   "symbol": "Switch:SW_Push",
+   "value": "BOOT",
+   "lcsc": "C318884",
+   "footprint": "Button_Switch_SMD:SW_SPST_TL3342",
+   "sheet": "MCU",
+   "pins": {
+    "1": "IO9",
+    "2": "GND"
+   }
+  },
+  {
+   "ref": "R6",
+   "symbol": "Device:R",
+   "value": "10k",
+   "lcsc": "C25804",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "IO2"
+   }
+  },
+  {
+   "ref": "R7",
+   "symbol": "Device:R",
+   "value": "1k",
+   "lcsc": "C21190",
+   "footprint": "Resistor_SMD:R_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "1": "+3V3",
+    "2": "USER_LED"
+   }
+  },
+  {
+   "ref": "D2",
+   "symbol": "Device:LED",
+   "value": "GREEN",
+   "lcsc": "C72043",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "sheet": "MCU",
+   "pins": {
+    "A": "USER_LED",
+    "K": "IO8"
+   }
+  },
+  {
+   "ref": "J2",
+   "symbol": "Connector_Generic:Conn_01x10",
+   "value": "GPIO",
+   "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x10_P2.54mm_Vertical",
+   "sheet": "IO",
+   "pins": {
+    "1": "+3V3",
+    "2": "GND",
+    "3": "TXD",
+    "4": "RXD",
+    "5": "IO0",
+    "6": "IO1",
+    "7": "IO2",
+    "8": "IO3",
+    "9": "IO4",
+    "10": "VBUS"
+   }
+  }
+ ]
+}
