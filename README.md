@@ -164,7 +164,8 @@ Claude follows the same steps every time.
 
 | Choice | Effect |
 | --- | --- |
-| 20 tools with short descriptions | tool schemas ≈ 2.4k tokens; other KiCad MCP servers ship 64 to 216 tools |
+| 20 tools with short descriptions | all tool schemas together ≈ 3.3k tokens (13.3k characters, measured) |
+| Small answers | in the [CH340 run](examples/ch340-usb-uart/SESSION.md) all 48 tool results together were ≈ 4.2k tokens, about 350 characters per call |
 | No raw KiCad files, one line per footprint | a 7-part board summary is about 900 characters |
 | DRC/ERC grouped by type, three example locations | 300 violations → about 1 KB |
 | Workflow in a skill | loaded only when you work on a PCB |
