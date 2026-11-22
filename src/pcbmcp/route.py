@@ -23,13 +23,20 @@ DEFAULT_JAR = paths.DATA_DIR / "freerouting.jar"
 
 
 def jar_path() -> Path:
-    p = Path(os.environ.get("FREEROUTING_JAR", DEFAULT_JAR)).expanduser()
+    """Freerouting jar. Varsayılan yerde yoksa sabit sürümü bir kez indirir (plugin kullanıcısı
+    doctor çalıştırmak zorunda kalmasın); FREEROUTING_JAR açıkça verilmişse indirmez."""
+    explicit = os.environ.get("FREEROUTING_JAR")
+    p = Path(explicit or DEFAULT_JAR).expanduser()
+    if not p.is_file() and not explicit:
+        from . import doctor  # doctor route'u import ediyor; döngü olmasın
+        try:
+            doctor.download_jar(p)
+        except Exception as e:  # ağ yok, GitHub erişilemez...
+            raise KicadError(f"Freerouting jar missing and download failed ({e}). Download "
+                             f"{doctor.FREEROUTING_URL} to {p} or set FREEROUTING_JAR.") from None
     if not p.is_file():
-        raise KicadError(
-            f"Freerouting jar not found at {p}. Download freerouting-<ver>.jar from "
-            "https://github.com/freerouting/freerouting/releases "
-            "or set FREEROUTING_JAR, or run `pcbmcp doctor --fix`."
-        )
+        raise KicadError(f"Freerouting jar not found at {p} (FREEROUTING_JAR). Unset it to download "
+                         "automatically, or run `pcbmcp doctor --fix`.")
     return p
 
 

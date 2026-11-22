@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "pcbmcp",
+  "version": "0.1.0",
+  "description": "Token-efficient KiCad PCB design: schematic from a JSON spec, placement, autorouting, DRC/ERC and JLCPCB fab export.",
+  "author": {
+    "name": "Atilla"
+  },
+  "license": "MIT",
+  "keywords": ["kicad", "pcb", "electronics", "jlcpcb", "mcp"],
+  "skills": ["./skills/"],
+  "mcpServers": {
+    "pcbmcp": {
+      "command": "uv",
+      "args": ["run", "--quiet", "--directory", "${CLAUDE_PLUGIN_ROOT}", "--extra", "lcsc", "pcbmcp"]
+    }
+  }
+}

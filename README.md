@@ -20,21 +20,22 @@ Linux, macOS and Windows. KiCad is located automatically (`/usr/share/kicad`, `K
 `%ProgramFiles%\KiCad\<version>`). Linux is the most tested platform; on macOS/Windows please run
 `pcbmcp doctor` and open an issue if something is not found.
 
-## Install
-```bash
-git clone <repo-url> pcbmcp && cd pcbmcp
-uv sync                       # add --extra lcsc to import parts from LCSC/EasyEDA
-uv run pcbmcp doctor --fix    # checks KiCad, pcbnew, Java; downloads Freerouting if missing
+## Install (Claude Code plugin)
+In Claude Code:
 ```
-
-**Use it in this folder:** run `claude` here. `.mcp.json` starts the server and
-`.claude/skills/pcb-design` loads the design workflow and JLCPCB rules.
-
-**Use it in your own projects:**
-```bash
-claude mcp add pcbmcp -- uv run --directory /path/to/pcbmcp pcbmcp
-cp -r /path/to/pcbmcp/.claude/skills/pcb-design ~/.claude/skills/   # workflow + checklist
+/plugin install pcbmcp --marketplace <owner>/<repo>
 ```
+On older Claude Code versions: `/plugin marketplace add <owner>/<repo>`, then `/plugin install pcbmcp@pcbmcp`.
+
+The plugin brings the MCP server (20 tools) and the `pcb-design` skill (design loop, JLCPCB limits,
+review checklist). On first start `uv` builds its environment, and the first `autoroute` downloads
+Freerouting. Nothing else to set up; it works in any project folder.
+
+If something is not found, ask Claude to "run the pcbmcp doctor": it checks KiCad, pcbnew, Java and the
+network and names the environment variable to set for anything it cannot detect.
+
+**Without the plugin system** (other MCP clients): clone the repo and register
+`uv run --directory /path/to/pcbmcp --extra lcsc pcbmcp` as a stdio server.
 
 If detection fails, set any of `PCBMCP_KICAD_CLI`, `PCBMCP_KICAD_PYTHON` (KiCad's own Python, the one that
 can `import pcbnew`), `PCBMCP_SYMBOL_DIR`, `PCBMCP_FOOTPRINT_DIR`, `PCBMCP_JAVA`, `FREEROUTING_JAR`.
@@ -88,8 +89,10 @@ self-contained and can be shared as is.
 
 ## Development
 ```bash
+git clone <repo-url> pcbmcp && cd pcbmcp
 uv sync --extra lcsc
-uv run pytest -q   # KiCad-dependent tests are skipped when KiCad is not installed
+uv run pytest -q          # KiCad-dependent tests are skipped when KiCad is not installed
+claude --plugin-dir .     # run Claude Code with your working copy as the plugin
 ```
 Example board: `<KiCad Python> scripts/make_example_board.py examples/ldo/ldo.kicad_pcb`
 
@@ -104,5 +107,5 @@ MIT, see [LICENSE](LICENSE). **The schematics, boards and fabrication files you 
 no tool's license carries over to its output.
 
 Optional components are installed separately under their own licenses: easyeda2kicad (AGPL-3.0, the `lcsc`
-extra, run as a separate process) and Freerouting (GPL-3.0, a separate jar fetched by `doctor --fix`).
+extra, run as a separate process) and Freerouting (GPL-3.0, a separate jar downloaded on first use).
 KiCad itself is GPL-3.0.

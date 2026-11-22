@@ -42,15 +42,22 @@ Neden böyle:
 Gerekenler: KiCad 10, [uv](https://docs.astral.sh/uv/), autoroute için Java 25+. Linux, macOS ve Windows;
 KiCad yolları otomatik bulunur, `PCBMCP_KICAD_CLI`, `PCBMCP_KICAD_PYTHON`, `PCBMCP_SYMBOL_DIR`,
 `PCBMCP_FOOTPRINT_DIR` ile ezilebilir.
+Claude Code plugin'i olarak (Claude Code içinde):
+```
+/plugin install pcbmcp --marketplace <owner>/<repo>
+```
+Eski sürümlerde: `/plugin marketplace add <owner>/<repo>`, sonra `/plugin install pcbmcp@pcbmcp`.
+Plugin MCP sunucusunu ve `pcb-design` skill'ini getirir; her proje klasöründe çalışır. İlk açılışta `uv`
+ortamı kurar, ilk `autoroute` Freerouting'i indirir.
+
+Geliştirme:
 ```bash
 git clone <repo-url> pcbmcp && cd pcbmcp
-uv sync                       # LCSC içe aktarma da lazımsa: uv sync --extra lcsc
-uv run pcbmcp doctor --fix    # KiCad/pcbnew/Java kontrolü; Freerouting jar yoksa indirir
+uv sync --extra lcsc
+uv run pcbmcp doctor          # KiCad/pcbnew/Java kontrolü (--fix: Freerouting'i şimdi indir)
 uv run pytest -q              # KiCad gerektiren testler KiCad yoksa atlanır
+claude --plugin-dir .         # çalışma kopyasını plugin olarak yükle
 ```
-Bu klasörde `claude` açınca `.mcp.json` sunucuyu, `.claude/skills/pcb-design` iş akışını yükler.
-Başka projelerde: `claude mcp add pcbmcp -- uv run --directory <bu klasör> pcbmcp` ve skill için
-`.claude/skills/pcb-design` klasörünü `~/.claude/skills/` altına kopyalayın.
 
 İçe aktarılan parçalar ve Freerouting jar kullanıcı veri dizininde durur (`pcbmcp doctor` gösterir;
 `PCBMCP_DATA_DIR` ile değişir). Stok olmayan kütüphaneler projenin `lib/` klasörüne kopyalanır, proje
@@ -125,4 +132,4 @@ Sınırlar: sheet kutularında hiyerarşik pin yok (portlar yazı olarak); şema
 ## Lisans
 MIT. Ürettiğiniz şematik, PCB ve üretim dosyaları tamamen sizindir; hiçbir aracın lisansı çıktıya geçmez.
 Opsiyonel bağımlılıklar kendi lisanslarıyla ayrıca kurulur: easyeda2kicad (AGPL-3.0, `[lcsc]` extra'sı,
-ayrı süreç olarak çağrılır), Freerouting (GPL-3.0, `doctor --fix` ile indirilen ayrı jar). KiCad GPL-3.0.
+ayrı süreç olarak çağrılır), Freerouting (GPL-3.0, ilk kullanımda indirilen ayrı jar). KiCad GPL-3.0.
