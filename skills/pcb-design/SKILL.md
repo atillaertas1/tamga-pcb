@@ -19,7 +19,9 @@ are overwritten by the next `sync_design`, so change the spec instead.
 2. For each part: `find_symbol` → `get_symbol(lib_id, footprint)` to confirm pin names and that the
    footprint pad numbers match → `find_footprint` (using the symbol's `fp_filters`).
    Compute passive values and tell the user the reasoning (e.g. LED: R = (Vin−Vf)/I).
-3. Pick an LCSC code with `search_parts` and put it in the spec as `lcsc`. Then
+3. Pick an LCSC code with `search_parts` and put it in the spec as `lcsc`. Passives search by value:
+   `search_parts('5.1k', package='0603', basic_only=True)`, `search_parts('100nF', package='0603')`. If an IC
+   returns nothing, its LCSC code (`search_parts('C84681')`) still works. Then
    `get_symbol(lib_id, footprint, lcsc)`: if `pinout_check` says `mismatch`, it may be the wrong symbol
    variant, the wrong part or LED polarity; do not move on without checking the datasheet.
    If KiCad has no suitable symbol/footprint, use `import_lcsc_part(lcsc)`. If it returns
@@ -50,7 +52,9 @@ are overwritten by the next `sync_design`, so change the spec instead.
 5. Critical nets (near an isolation barrier, power paths that must stay short, sensitive analog):
    guide them first with `route_net(net, 'U1.3', 'C5.1', points)` (they stay locked). Then
    `autoroute` → `add_copper_zone` (default: GND, both layers + 5 mm stitching vias) → `run_drc`.
-   `autoroute` writes to the board itself (with a backup). Do not copy the board under another name and run
+   `autoroute` writes to the board itself (with a backup) and first rips up unlocked tracks/vias, so after moving
+   parts just run `autoroute` again, then `add_copper_zone` again (it replaces the old pour). Never try to edit
+   tracks or restore backups by other means. Do not copy the board under another name and run
    DRC on it: KiCad reads the rules from the `.kicad_pro`/`.kicad_dru` with the same name. If `run_drc`
    returns `rules_warning`, the result is not valid.
 6. Until DRC is `CLEAN`: start with the most frequent violation type and use the `examples` locations.

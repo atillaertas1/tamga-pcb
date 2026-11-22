@@ -212,3 +212,21 @@ def test_satellites_are_wired_to_their_pin(tmp_path):
     sch = (tmp_path / "pu.kicad_sch").read_text()
     assert sch.count('(global_label "SIG"') == 1   # eskiden her pinde bir etiket: 3
     assert "(junction" in sch and sch.count("(wire") >= 6
+
+
+@needs_router
+def test_move_after_routing_then_reroute_is_clean(tmp_path, monkeypatch):
+    """Rotadan sonra parça taşınıp yeniden rotalanınca eski izler kalmamalı (gerçek oturumda 28 DRC hatası
+    ve kısa devre böyle çıkmıştı); tekrar dökülen GND eskisinin yerine geçer."""
+    monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
+    pcb = design.sync(str(tmp_path), "led", LED_SPEC, None)["files"]["pcb"]
+    place = [{"ref": "J1", "x": 103, "y": 106, "rot": 0}, {"ref": "R1", "x": 109, "y": 104.5, "rot": 0},
+             {"ref": "D1", "x": 115, "y": 104.5, "rot": 180}]
+    server.place_footprints(pcb, place)
+    server.autoroute(pcb, max_passes=50)
+    server.add_copper_zone(pcb)
+    server.place_footprints(pcb, [{"ref": "D1", "x": 115, "y": 110, "rot": 180}])
+    r = server.autoroute(pcb, max_passes=50)
+    assert r["ripped_up"] > 0 and r["unrouted_after"] == 0
+    assert server.add_copper_zone(pcb).get("replaced_zones") == 2
+    assert server.run_drc(pcb, schematic_parity=True).get("verdict") == "CLEAN"

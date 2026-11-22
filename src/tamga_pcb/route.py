@@ -75,7 +75,7 @@ class Progress:
 
 def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
               ignore_netclasses: list[str] | None = None, timeout: int = 900,
-              on_progress: Callable[[str, int], None] | None = None) -> dict:
+              on_progress: Callable[[str, int], None] | None = None, rip_up: bool = True) -> dict:
     """on_progress(message, routing_pass) her geçişte çağrılır (MCP progress bildirimi için)."""
     jar = jar_path()
     # Varsayılan: kartın kendisine yaz (import_ses yedek alır). Ayrı bir <ad>_routed.kicad_pcb
@@ -85,7 +85,7 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
     work = Path(tempfile.mkdtemp(prefix="tamga-pcb-route-"))
     dsn, ses = work / "board.dsn", work / "board.ses"
     try:
-        run_worker("export_dsn", {"pcb": pcb, "dsn": str(dsn)})
+        exported = run_worker("export_dsn", {"pcb": pcb, "dsn": str(dsn), "rip_up": rip_up})
         cmd = [JAVA, "-jar", str(jar), "-de", str(dsn), "-do", str(ses),
                "--gui.enabled=false", f"--router.autorouter.max_passes={max_passes}",
                "--logging.file.enabled=false", "-da"]
@@ -129,6 +129,8 @@ def autoroute(pcb: str, out: str | None = None, max_passes: int = 100,
         res = run_worker("import_ses", {"pcb": pcb, "ses": str(ses), "out": out})
         res["freerouting"] = (f"{prog.routing_passes} routing + {prog.optimizer_passes} optimizer passes "
                               f"in {time.monotonic() - t0:.0f}s")
+        if exported.get("ripped_up"):
+            res["ripped_up"] = exported["ripped_up"]
         res["note"] = "Run run_drc on the routed board; review power/critical nets by eye."
         return res
     finally:

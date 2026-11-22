@@ -195,9 +195,11 @@ def route_net(pcb_path: str, net: str, from_pad: str, to_pad: str,
 @tool
 def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
               ignore_netclasses: list[str] | None = None, timeout_s: int = 900,
-              ctx: Context = None) -> dict:
+              rip_up: bool = True, ctx: Context = None) -> dict:
     """Autoroute with Freerouting (headless). Writes the board in place (backup kept) unless
     out_path given; a board under another name loses the project's rules (see run_drc). Reports unrouted before/after. Route critical nets by hand first, then run this.
+    rip_up (default) first removes unlocked tracks/vias, so moving parts and rerouting is safe; locked
+    route_net tracks stay. Re-run add_copper_zone afterwards (it replaces the old pour).
     Sends progress per pass; on timeout reports the pass reached (nothing is written)."""
     on_progress = None
     if ctx is not None:
@@ -207,7 +209,7 @@ def autoroute(pcb_path: str, out_path: str = "", max_passes: int = 100,
             except Exception:  # istemci progress token vermediyse vb. — rotayı bozma
                 pass
     return route.autoroute(abspath(pcb_path), abspath(out_path) if out_path else None,
-                           max_passes, ignore_netclasses, timeout_s, on_progress)
+                           max_passes, ignore_netclasses, timeout_s, on_progress, rip_up)
 
 
 # ------------------------------------------------------------------ doğrulama

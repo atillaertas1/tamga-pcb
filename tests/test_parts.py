@@ -21,7 +21,7 @@ def client(payload=FAKE, status=200):
 
 
 def test_filters_and_ranks_basic_first():
-    r = parts.search("10k", package="0402", client=client())
+    r = parts.search("RC0402", package="0402", client=client())
     assert r["matched"] == 2
     assert r["parts"][0].startswith("C2 [B] BASIC | 0402")
     assert "$0.002" in r["parts"][0] and "ROHS" not in r["parts"][0]
@@ -29,7 +29,7 @@ def test_filters_and_ranks_basic_first():
 
 
 def test_basic_only():
-    r = parts.search("10k", package="0402", basic_only=True, client=client())
+    r = parts.search("RC0402", package="0402", basic_only=True, client=client())
     assert [p.split()[0] for p in r["parts"]] == ["C2"]
 
 
@@ -43,3 +43,28 @@ def test_rejected_query_passes_api_hint_through():
     hint = {"error": "Invalid search", "message": 'Add another search term, such as "8MHz crystal"'}
     with pytest.raises(ToolError, match=r"rejected.*8MHz crystal.*resistor 5\.1k"):
         parts.search("5.1k", client=client(hint, status=400))
+
+
+@pytest.mark.parametrize("q,want", [("5.1k", ("resistors", 5100)), ("resistor 10k", ("resistors", 10000)),
+                                    ("4k7", ("resistors", 4700)), ("100R", ("resistors", 100)),
+                                    ("1M", ("resistors", 1e6)), ("100nF", ("capacitors", 1e-7)),
+                                    ("capacitor 10uF", ("capacitors", 1e-5)), ("22pF 50V", ("capacitors", 22e-12)),
+                                    ("CH340C", None), ("LED red", None), ("USB-C 16P", None)])
+def test_value_queries_go_to_value_endpoints(q, want):
+    got = parts.value_query(q)
+    assert (got is None) if want is None else (got[0] == want[0] and abs(got[1] - want[1]) < want[1] * 1e-9)
+
+
+def test_basic_part_with_unknown_stock_is_kept():
+    """jlcsearch basic parçalarda stock=None döndürüyor; min_stock filtresi onları elememeli."""
+    payload = {"resistors": [{"lcsc": 23186, "mfr": "0603WAF5101T5E", "package": "0603", "stock": None,
+                              "price1": 0.0005, "description": "5.1kΩ", "is_basic": True},
+                             {"lcsc": 9, "mfr": "LOW", "package": "0603", "stock": 3, "is_basic": False}]}
+    seen = {}
+
+    def handler(req):
+        seen["path"] = req.url.path
+        return httpx.Response(200, json=payload)
+    r = parts.search("5.1k", package="0603", basic_only=True, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert seen["path"] == "/resistors/list.json"
+    assert r["parts"] and r["parts"][0].startswith("C23186 [B]") and "stock ?" in r["parts"][0]

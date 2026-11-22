@@ -254,6 +254,13 @@ def cmd_add_zone(a: dict) -> dict:
         out = {"keepout": f"tracks on {'+'.join(layers)}", "backup": backup(path)}
         pcbnew.SaveBoard(path, b)
         return out
+    replaced = 0
+    if not poly:  # tam kart dökümü tekrar çağrılırsa (rotadan sonra) eskisinin yerine geçsin, üst üste binmesin
+        for z in list(b.Zones()):
+            if (not z.GetIsRuleArea() and z.GetNetname() == a["net"] and z.GetAssignedPriority() == int(a.get("priority", 0))
+                    and z.GetLayerName() in layers):
+                b.Remove(z)
+                replaced += 1
     for lname in layers:
         z = pcbnew.ZONE(b)
         z.SetLayer(b.GetLayerID(lname))
@@ -272,6 +279,8 @@ def cmd_add_zone(a: dict) -> dict:
     filler = pcbnew.ZONE_FILLER(b)
     filler.Fill(list(b.Zones()))
     out = {"zone": f"{a['net']} on {'+'.join(layers)}"}
+    if replaced:
+        out["replaced_zones"] = replaced
     pitch = float(a.get("stitch_pitch_mm") or 0)
     if pitch > 0:
         out["stitch_vias"] = _stitch(b, net, pitch)
@@ -284,11 +293,20 @@ def cmd_add_zone(a: dict) -> dict:
 
 def cmd_export_dsn(a: dict) -> dict:
     b = load(a["pcb"])
+    edge_um = b.GetDesignSettings().m_CopperEdgeClearance / 1000.0  # izleri silmeden önce (SWIG tipi kayboluyor)
+    ripped = 0
+    if a.get("rip_up"):
+        # Kilitli olmayan iz/via'ları (önceki autoroute, stitching) yalnız bellekte sil: DSN'de sabit
+        # kablo olarak kalırlarsa parça taşındıktan sonra eski izler kartta kalır (kısa devre).
+        # SES içe aktarımı kartın rotasını oturumla değiştirir; kilitli route_net izleri korunur.
+        for t in list(b.GetTracks()):
+            if not t.IsLocked():
+                b.Remove(t)
+                ripped += 1
     ok = pcbnew.ExportSpecctraDSN(b, a["dsn"])
     if not ok:
         raise RuntimeError("ExportSpecctraDSN failed")
-    edge_um = b.GetDesignSettings().m_CopperEdgeClearance / 1000.0
-    return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um)}
+    return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um), "ripped_up": ripped}
 
 
 def _widen_boundary(dsn_path: str, edge_um: float, margin_um: float = 20) -> float:
