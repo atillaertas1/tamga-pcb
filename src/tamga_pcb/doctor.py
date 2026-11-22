@@ -19,7 +19,7 @@ from pathlib import Path
 import httpx
 
 from . import library, parts, paths, pinout, route
-from .kicad import KICAD_CLI, KICAD_PYTHON
+from .kicad import KICAD_CLI, KICAD_PYTHON, ensure_global_lib_tables
 
 FREEROUTING_VERSION = "2.5.0"
 FREEROUTING_URL = (f"https://github.com/freerouting/freerouting/releases/download/"
@@ -94,6 +94,8 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
     n_fp = len(list(library.FP_DIR.glob("*.pretty")))
     add(n_fp > 0, "footprint libs", f"{n_fp} in {library.FP_DIR}", "set TAMGA_FOOTPRINT_DIR")
 
+    if made := ensure_global_lib_tables():  # yeni kurulumda KiCad'in ilk açılışta yaptığını yap
+        out.append(("info", "global lib tables", "created " + ", ".join(made), ""))
     out.append(("info", "data dir", f"{paths.DATA_DIR} (imported parts, Freerouting jar)", ""))
 
     # autoroute: jar + java

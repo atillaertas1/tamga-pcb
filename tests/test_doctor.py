@@ -22,6 +22,8 @@ def test_jar_java_version_from_class_file(tmp_path):
 @pytest.mark.parametrize("banner,want", [('openjdk version "27.0.1" 2026-10-24', 27),
                                          ('java version "1.8.0_402"', 8)])
 def test_java_version_parsing(tmp_path, banner, want):
+    if sys.platform == "win32":
+        pytest.skip("shebang script cannot stand in for java on Windows")
     java = tmp_path / "java"
     java.write_text(f"#!{sys.executable}\nimport sys\nprint({banner!r}, file=sys.stderr)\n")
     java.chmod(0o755)

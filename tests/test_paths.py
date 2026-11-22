@@ -43,3 +43,24 @@ def test_user_dirs_per_platform(tmp_path):
 
 def test_bundled_custom_symbols_ship_in_package():
     assert (paths.BUNDLED / "symbols" / "tamga_custom.kicad_sym").is_file()
+
+
+def test_kicad_config_dir_per_platform(tmp_path):
+    assert paths.kicad_config_dir(10, "linux", {"XDG_CONFIG_HOME": str(tmp_path)}) == tmp_path / "kicad" / "10.0"
+    assert paths.kicad_config_dir(10, "win32", {"APPDATA": str(tmp_path)}) == tmp_path / "kicad" / "10.0"
+    assert paths.kicad_config_dir(10, "linux", {"KICAD_CONFIG_HOME": str(tmp_path)}) == tmp_path / "10.0"
+
+
+def test_fresh_kicad_gets_global_lib_tables(tmp_path):
+    """Hiç açılmamış KiCad: genel tablolar şablonu gösteren iç içe tabloyla yazılır, varsa dokunulmaz."""
+    from tamga_pcb import kicad, sexpr
+    tpl, cfg = tmp_path / "template", tmp_path / "cfg"
+    for name in ("sym-lib-table", "fp-lib-table"):
+        _touch(tpl / name)
+    (cfg / "fp-lib-table").parent.mkdir(parents=True)
+    (cfg / "fp-lib-table").write_text("(fp_lib_table (version 7))")  # kullanıcınınki
+    assert kicad.write_global_lib_tables(cfg, tpl) == [str(cfg / "sym-lib-table")]
+    lib = sexpr.child(sexpr.parse((cfg / "sym-lib-table").read_text()), "lib")
+    assert sexpr.value(lib, "type") == "Table" and sexpr.value(lib, "uri") == (tpl / "sym-lib-table").as_posix()
+    assert (cfg / "fp-lib-table").read_text() == "(fp_lib_table (version 7))"
+    assert kicad.write_global_lib_tables(cfg, tpl) == []

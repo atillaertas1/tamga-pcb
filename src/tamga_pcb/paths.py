@@ -28,7 +28,7 @@ def _version_key(p: Path) -> tuple:
 
 def kicad_install(system: str | None = None, env: os._Environ | dict | None = None,
                   mac_apps: Path = Path("/Applications")) -> dict[str, str]:
-    """Tespit edilen KiCad yolları: {'cli', 'python', 'symbols', 'footprints'}.
+    """Tespit edilen KiCad yolları: {'cli', 'python', 'symbols', 'footprints', 'template'}.
     Bulunamayan değer için makul varsayılan döner (doctor ne eksik olduğunu söyler)."""
     env = os.environ if env is None else env
     plat = _platform(system)
@@ -59,7 +59,24 @@ def kicad_install(system: str | None = None, env: os._Environ | dict | None = No
 
     return {"cli": cli, "python": str(python),
             "symbols": kicad_var("SYMBOL") or str(share / "symbols"),
-            "footprints": kicad_var("FOOTPRINT") or str(share / "footprints")}
+            "footprints": kicad_var("FOOTPRINT") or str(share / "footprints"),
+            "template": kicad_var("TEMPLATE") or str(share / "template")}
+
+
+def kicad_config_dir(major: int, system: str | None = None, env: os._Environ | dict | None = None) -> Path:
+    """KiCad'in kullanıcı ayar dizini (genel sym-lib-table / fp-lib-table burada), ör. ~/.config/kicad/10.0."""
+    env = os.environ if env is None else env
+    home = Path.home()
+    plat = _platform(system)
+    if env.get("KICAD_CONFIG_HOME"):
+        base = Path(env["KICAD_CONFIG_HOME"])
+    elif plat == "win":
+        base = Path(env.get("APPDATA", home / "AppData" / "Roaming")) / "kicad"
+    elif plat == "mac":
+        base = home / "Library" / "Preferences" / "kicad"
+    else:
+        base = Path(env.get("XDG_CONFIG_HOME", home / ".config")) / "kicad"
+    return base / f"{major}.0"
 
 
 def user_dir(kind: str, system: str | None = None, env: os._Environ | dict | None = None) -> Path:
@@ -82,6 +99,7 @@ KICAD_CLI = os.environ.get("TAMGA_KICAD_CLI", _K["cli"])
 KICAD_PYTHON = os.environ.get("TAMGA_KICAD_PYTHON", _K["python"])
 SYMBOL_DIR = Path(os.environ.get("TAMGA_SYMBOL_DIR", _K["symbols"]))
 FOOTPRINT_DIR = Path(os.environ.get("TAMGA_FOOTPRINT_DIR", _K["footprints"]))
+TEMPLATE_DIR = Path(os.environ.get("TAMGA_TEMPLATE_DIR", _K["template"]))
 # İçe aktarılan parçalar (tamga_lcsc) ve indirilen Freerouting jar burada durur.
 DATA_DIR = Path(os.environ.get("TAMGA_DATA_DIR", user_dir("data"))).expanduser()
 CACHE_DIR = Path(os.environ.get("TAMGA_CACHE_DIR", user_dir("cache"))).expanduser()

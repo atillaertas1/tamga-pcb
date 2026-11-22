@@ -1,13 +1,16 @@
 """KiCad'e erişim katmanı: kicad-cli alt süreçleri + pcbnew worker köprüsü."""
 from __future__ import annotations
 
+import functools
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
+from . import paths
 from .paths import KICAD_CLI, KICAD_PYTHON  # noqa: F401  (platforma göre tespit, env ile ezilir)
 
 # pcbnew modülü KiCad'in kendi Python'unda yaşar, venv'de değil.
@@ -55,8 +58,38 @@ def _clear_stale_locks(args: tuple[str, ...]) -> None:
                 lck.unlink(missing_ok=True)
 
 
+def write_global_lib_tables(cfg: Path, template: Path) -> list[str]:
+    """Eksik genel sym-lib-table / fp-lib-table'ı KiCad'in ilk açılışta yaptığı gibi yaz: KiCad şablon
+    tablosunu gösteren tek bir iç içe tablo. Var olan tabloya asla dokunmaz. -> yazılan dosyalar"""
+    made = []
+    for name in ("sym-lib-table", "fp-lib-table"):
+        dst, tpl = cfg / name, template / name
+        if dst.exists() or not tpl.is_file():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(f'({name.replace("-", "_")}\n\t(version 7)\n\t(lib (name "KiCad") (type "Table") '
+                       f'(uri "{tpl.as_posix()}") (options "") (descr "KiCad Default Libraries"))\n)\n',
+                       encoding="utf-8", newline="\n")
+        made.append(str(dst))
+    return made
+
+
+@functools.cache
+def ensure_global_lib_tables() -> list[str]:
+    """Hiç açılmamış KiCad'de (yeni kurulum, CI) genel kütüphane tabloları yoktur; kicad-cli o zaman her stok
+    parçayı 'library not in configuration' diye işaretler ve ERC/DRC hiç CLEAN olmaz. Süreç başına bir kez."""
+    try:
+        out = subprocess.run([KICAD_CLI, "version"], capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=60).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    m = re.match(r"\s*(\d+)\.", out)
+    return write_global_lib_tables(paths.kicad_config_dir(int(m.group(1))), paths.TEMPLATE_DIR) if m else []
+
+
 def cli(*args: str, timeout: int = 300, ok_codes: tuple[int, ...] = (0,),
         retries: int = 2) -> subprocess.CompletedProcess:
+    ensure_global_lib_tables()
     for attempt in range(retries + 1):
         try:
             proc = subprocess.run([KICAD_CLI, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
