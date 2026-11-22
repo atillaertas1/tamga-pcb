@@ -1,6 +1,6 @@
 """LCSC parçasını KiCad kütüphanesine içe aktar (easyeda2kicad + kicad-cli upgrade).
 
-Çıktı: symbols/pcbmcp_lcsc.kicad_sym, footprints/pcbmcp_lcsc.pretty/, footprints/pcbmcp_lcsc.3dshapes/
+Çıktı (paths.DATA_DIR altında): symbols/pcbmcp_lcsc.kicad_sym, footprints/pcbmcp_lcsc.pretty/, footprints/pcbmcp_lcsc.3dshapes/
 
 EasyEDA dönüşümünün doğruluğu garanti değil. Gerçek örnek: Hirose DF40C-100DS için EasyEDA
 pad'leri U şeklinde (bir sıra 1..50) numaralar, KiCad/Hirose tek-çift (1 ve 2 karşılıklı).
@@ -19,16 +19,15 @@ from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import library, sexpr
+from . import library, paths, sexpr
 from .kicad import cli
 from .sexpr import children, child
 
 LIB = "pcbmcp_lcsc"
-REPO = Path(__file__).resolve().parents[2]
 
 
 def _paths() -> dict[str, Path]:
-    root = Path(os.environ.get("PCBMCP_IMPORT_DIR", REPO))
+    root = Path(os.environ.get("PCBMCP_IMPORT_DIR", paths.DATA_DIR))
     return {"sym": root / "symbols" / f"{LIB}.kicad_sym",
             "fp": root / "footprints" / f"{LIB}.pretty",
             "3d": root / "footprints" / f"{LIB}.3dshapes"}

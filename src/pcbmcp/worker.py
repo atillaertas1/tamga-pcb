@@ -436,9 +436,9 @@ def cmd_set_netclass(a: dict) -> dict:
     return out
 
 
-FP_DIRS = [os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints"),
-           os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "footprints"),
-           *(p for p in os.environ.get("PCBMCP_EXTRA_FOOTPRINT_DIRS", "").split(os.pathsep) if p)]
+# Sunucu library.FP_DIRS'ı PCBMCP_FP_DIRS ile geçirir (worker KiCad Python'unda, paketi import edemez).
+FP_DIRS = [p for name in ("PCBMCP_FP_DIRS", "PCBMCP_EXTRA_FOOTPRINT_DIRS")
+           for p in os.environ.get(name, "").split(os.pathsep) if p]
 
 
 def _edge_rect(b, x0: float, y0: float, w: float, h: float) -> None:

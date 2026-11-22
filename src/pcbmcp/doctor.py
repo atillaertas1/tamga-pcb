@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 
-from . import library, parts, pinout, route
+from . import library, parts, paths, pinout, route
 from .kicad import KICAD_CLI, KICAD_PYTHON
 
 FREEROUTING_VERSION = "2.5.0"
@@ -85,12 +85,16 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
 
     code, pv = _run(KICAD_PYTHON, "-c", "import pcbnew; print(pcbnew.Version())")
     add(code == 0, "pcbnew", f"{pv} ({KICAD_PYTHON})" if code == 0 else f"import failed ({KICAD_PYTHON})",
-        "pcbnew lives in the Python KiCad was built for; set PCBMCP_KICAD_PYTHON to it")
+        "pcbnew lives in KiCad's own Python (Linux: /usr/bin/python3, macOS: KiCad.app/Contents/"
+        "Frameworks/Python.framework/Versions/Current/bin/python3, Windows: KiCad\\<ver>\\bin\\python.exe);"
+        " set PCBMCP_KICAD_PYTHON to it")
 
     n_sym = len(list(library.SYM_DIR.glob("*.kicad_sym")))
     add(n_sym > 0, "symbol libs", f"{n_sym} in {library.SYM_DIR}", "set PCBMCP_SYMBOL_DIR")
     n_fp = len(list(library.FP_DIR.glob("*.pretty")))
     add(n_fp > 0, "footprint libs", f"{n_fp} in {library.FP_DIR}", "set PCBMCP_FOOTPRINT_DIR")
+
+    out.append(("info", "data dir", f"{paths.DATA_DIR} (imported parts, Freerouting jar)", ""))
 
     # autoroute: jar + java
     jar = Path(route.os.environ.get("FREEROUTING_JAR", route.DEFAULT_JAR)).expanduser()

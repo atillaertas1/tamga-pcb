@@ -1,13 +1,29 @@
 """Test kartı üret: AMS1117 3.3V LDO + güç LED'i, 30x20 mm, 2 katman, rotasız.
 
-Çalıştır:  /usr/bin/python3 scripts/make_example_board.py examples/ldo/ldo.kicad_pcb
+Çalıştır (KiCad'in Python'u ile; Linux'ta /usr/bin/python3, bkz. `pcbmcp doctor`):
+  <kicad-python> scripts/make_example_board.py examples/ldo/ldo.kicad_pcb
 """
 import os
 import sys
 
 import pcbnew
 
-FP = "/usr/share/kicad/footprints"
+
+
+def _stock_footprints() -> str:
+    """KiCad Python'unun yanındaki stok footprint dizini (Windows/macOS paketleri) ya da Linux yolu."""
+    if os.environ.get("PCBMCP_FOOTPRINT_DIR"):
+        return os.environ["PCBMCP_FOOTPRINT_DIR"]
+    exe = os.path.realpath(sys.executable)
+    for rel in (("..", "share", "kicad", "footprints"),                       # Windows: KiCad/<v>/bin
+                ("..", "..", "..", "..", "..", "SharedSupport", "footprints")):  # macOS: KiCad.app
+        cand = os.path.normpath(os.path.join(os.path.dirname(exe), *rel))
+        if os.path.isdir(cand):
+            return cand
+    return "/usr/share/kicad/footprints"
+
+
+FP = _stock_footprints()
 out = sys.argv[1] if len(sys.argv) > 1 else "examples/ldo/ldo.kicad_pcb"
 os.makedirs(os.path.dirname(out), exist_ok=True)
 

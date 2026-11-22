@@ -1,7 +1,7 @@
 """KiCad sembol/footprint kütüphanelerinde arama ve sembol çözümleme.
 
 - Arama: 222 MB'lık sembol kütüphanesini her seferinde ayrıştırmak yerine regex ile
-  çıkarılan küçük bir indeks (~/.cache/pcbmcp) kullanılır; kütüphane mtime'ı değişince yenilenir.
+  çıkarılan küçük bir indeks (paths.CACHE_DIR) kullanılır; kütüphane mtime'ı değişince yenilenir.
 - Çözümleme: `extends` ile türetilmiş semboller ebeveynle düzleştirilir, çünkü şematiğe
   gömülen sembol tam gövdeyi içermelidir.
 """
@@ -17,22 +17,21 @@ from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import sexpr
+from . import paths, sexpr
 from .sexpr import Sym, child, children, value
 
-SYM_DIR = Path(os.environ.get("PCBMCP_SYMBOL_DIR", "/usr/share/kicad/symbols"))
-# Projeye özel semboller (ör. 100 pinli B2B konnektör): repo/symbols + PCBMCP_EXTRA_SYMBOL_DIRS.
-SYM_DIRS = [SYM_DIR, Path(__file__).resolve().parents[2] / "symbols",
-            *(Path(p) for p in os.environ.get("PCBMCP_EXTRA_SYMBOL_DIRS", "").split(os.pathsep) if p)]
+SYM_DIR = paths.SYMBOL_DIR
+# Stok olmayanlar: paketle gelen (pcbmcp_custom), içe aktarılan (veri dizini), PCBMCP_EXTRA_SYMBOL_DIRS.
+SYM_DIRS = [SYM_DIR, paths.BUNDLED / "symbols", paths.DATA_DIR / "symbols",
+            *paths.env_dirs("PCBMCP_EXTRA_SYMBOL_DIRS")]
 
 
 def _sym_files() -> list[Path]:
     return [p for d in SYM_DIRS if d.is_dir() for p in sorted(d.glob("*.kicad_sym"))]
-FP_DIR = Path(os.environ.get("PCBMCP_FOOTPRINT_DIR", "/usr/share/kicad/footprints"))
-# İçe aktarılan / projeye özel footprint'ler: repo/footprints + PCBMCP_EXTRA_FOOTPRINT_DIRS.
-FP_DIRS = [FP_DIR, Path(__file__).resolve().parents[2] / "footprints",
-           *(Path(p) for p in os.environ.get("PCBMCP_EXTRA_FOOTPRINT_DIRS", "").split(os.pathsep) if p)]
-CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "pcbmcp"
+FP_DIR = paths.FOOTPRINT_DIR
+FP_DIRS = [FP_DIR, paths.BUNDLED / "footprints", paths.DATA_DIR / "footprints",
+           *paths.env_dirs("PCBMCP_EXTRA_FOOTPRINT_DIRS")]
+CACHE = paths.CACHE_DIR
 
 _TOP_SYM = re.compile(r'^\t\(symbol "([^"]+)"', re.M)
 _PROP = re.compile(r'^\t\t\(property "(Description|ki_keywords|ki_fp_filters|Footprint)" "([^"]*)"', re.M)

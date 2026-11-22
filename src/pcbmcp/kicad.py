@@ -8,9 +8,9 @@ from pathlib import Path
 
 from mcp.server.mcpserver.exceptions import ToolError
 
-KICAD_CLI = os.environ.get("PCBMCP_KICAD_CLI", "kicad-cli")
-# pcbnew modülü KiCad'in kurulu olduğu sistem Python'unda yaşar, venv'de değil.
-KICAD_PYTHON = os.environ.get("PCBMCP_KICAD_PYTHON", "/usr/bin/python3")
+from .paths import KICAD_CLI, KICAD_PYTHON  # noqa: F401  (platforma göre tespit, env ile ezilir)
+
+# pcbnew modülü KiCad'in kendi Python'unda yaşar, venv'de değil.
 WORKER = Path(__file__).with_name("worker.py")
 MARK = "@@PCBMCP@@"
 
@@ -26,10 +26,12 @@ def abspath(p: str) -> str:
 
 def run_worker(cmd: str, args: dict, timeout: int = 300) -> dict:
     """worker.py'yi sistem Python'u ile çalıştır, son işaretli JSON satırını döndür."""
+    from . import library  # döngüsel import olmasın; testlerdeki monkeypatch'ler de geçsin
+    env = {**os.environ, "PCBMCP_FP_DIRS": os.pathsep.join(map(str, library.FP_DIRS))}
     try:
         proc = subprocess.run(
             [KICAD_PYTHON, str(WORKER), cmd, json.dumps(args)],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, timeout=timeout, env=env,
         )
     except subprocess.TimeoutExpired:  # ToolError değilse model sadece "Error executing tool" görür
         raise KicadError(f"worker '{cmd}' timed out after {timeout}s") from None

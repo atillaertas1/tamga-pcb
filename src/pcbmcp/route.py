@@ -15,10 +15,11 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from . import paths
 from .kicad import KicadError, run_worker
 
 JAVA = os.environ.get("PCBMCP_JAVA", "java")
-DEFAULT_JAR = Path(__file__).resolve().parents[2] / "tools" / "freerouting.jar"
+DEFAULT_JAR = paths.DATA_DIR / "freerouting.jar"
 
 
 def jar_path() -> Path:
@@ -26,7 +27,7 @@ def jar_path() -> Path:
     if not p.is_file():
         raise KicadError(
             f"Freerouting jar not found at {p}. Download freerouting-<ver>.jar from "
-            "https://github.com/freerouting/freerouting/releases to tools/freerouting.jar "
+            "https://github.com/freerouting/freerouting/releases "
             "or set FREEROUTING_JAR, or run `pcbmcp doctor --fix`."
         )
     return p
