@@ -193,3 +193,22 @@ def test_sheets_power_symbols_and_notes(tmp_path):
     assert "330R" in page  # not sayfada
     root = (tmp_path / "led.kicad_sch").read_text()
     assert '"Sheetname" "LED Bölümü"' in root and "[güç] +5V GND" in root  # kök: sayfalar arası arayüz
+
+
+def test_satellites_are_wired_to_their_pin(tmp_path):
+    """Pine bağlı küçük parçalar (pull-up, filtre C) pinden çıkan tele bağlanır: net adı tek etiketten,
+    bağlantı noktasında junction; netlist adları spec'teki gibi kalır."""
+    spec = {"title": "PU", "board": {"width_mm": 20, "height_mm": 15}, "parts": [
+        {"ref": "J1", "symbol": "Connector_Generic:Conn_01x03", "value": "IN",
+         "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+         "pins": {"1": "+5V", "2": "SIG", "3": "GND"}},
+        {"ref": "R1", "symbol": "Device:R", "value": "10k", "footprint": "Resistor_SMD:R_0603_1608Metric",
+         "pins": {"1": "+5V", "2": "SIG"}},
+        {"ref": "C1", "symbol": "Device:C", "value": "100n", "footprint": "Capacitor_SMD:C_0603_1608Metric",
+         "pins": {"1": "SIG", "2": "GND"}},
+    ]}
+    r = design.sync(str(tmp_path), "pu", spec, None)
+    assert r["netlist_check"] == "OK" and r["erc"] == "CLEAN" and r["parity"] == "OK"
+    sch = (tmp_path / "pu.kicad_sch").read_text()
+    assert sch.count('(global_label "SIG"') == 1   # eskiden her pinde bir etiket: 3
+    assert "(junction" in sch and sch.count("(wire") >= 6
