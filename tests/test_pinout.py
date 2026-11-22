@@ -2,9 +2,10 @@
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import library, pinout
+from kicad_env import needs_libs
+from pcbmcp import pinout
 
-pytestmark = pytest.mark.skipif(not library.SYM_DIR.is_dir(), reason="KiCad libraries not installed")
+pytestmark = needs_libs
 
 
 def easyeda(title: str, pins: dict[str, str]) -> dict:

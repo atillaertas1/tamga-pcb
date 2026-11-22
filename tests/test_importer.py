@@ -6,11 +6,10 @@ from pathlib import Path
 import pytest
 
 from pcbmcp import design, importer, library
-from pcbmcp.kicad import KICAD_PYTHON
+from kicad_env import needs_cli, needs_kicad
 
 FIX = Path(__file__).parent / "fixtures" / "easyeda"
-pytestmark = pytest.mark.skipif(
-    shutil.which("kicad-cli") is None or not library.SYM_DIR.is_dir(), reason="KiCad not installed")
+pytestmark = needs_cli
 
 
 @pytest.fixture
@@ -42,8 +41,7 @@ def test_import_writes_kicad10_library(imp):
     assert (imp / "symbols" / "pcbmcp_lcsc.kicad_sym").read_text().count('(symbol "MMBT3904-C20526"') == 1
 
 
-@pytest.mark.skipif(subprocess.run([KICAD_PYTHON, "-c", "import pcbnew"], capture_output=True).returncode != 0,
-                    reason="pcbnew not available")
+@needs_kicad
 def test_imported_part_in_design_adds_lib_tables(imp, tmp_path, monkeypatch):
     importer.import_part("C20526")
     spec = {"title": "T", "board": {"width_mm": 20, "height_mm": 15}, "parts": [

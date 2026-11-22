@@ -26,7 +26,7 @@ def test_macos_app_bundle(tmp_path, monkeypatch):
     k = paths.kicad_install("darwin", {}, mac_apps=tmp_path)
     app = tmp_path / "KiCad" / "KiCad.app" / "Contents"
     assert k["cli"] == str(app / "MacOS" / "kicad-cli")
-    assert k["python"].endswith("Python.framework/Versions/Current/bin/python3")
+    assert Path(k["python"]).parts[-5:] == ("Python.framework", "Versions", "Current", "bin", "python3")
     assert k["footprints"] == str(app / "SharedSupport" / "footprints")
 
 

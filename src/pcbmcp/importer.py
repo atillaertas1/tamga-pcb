@@ -21,7 +21,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import library, paths, sexpr
 from .kicad import cli
-from .sexpr import children, child
+from .sexpr import children
 
 LIB = "pcbmcp_lcsc"
 

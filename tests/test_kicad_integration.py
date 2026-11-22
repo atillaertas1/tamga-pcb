@@ -7,15 +7,12 @@ from pathlib import Path
 import pytest
 
 from pcbmcp import server
+from kicad_env import JAR, needs_kicad, needs_router
 from pcbmcp.kicad import KICAD_PYTHON, KicadError
 
 ROOT = Path(__file__).resolve().parents[1]
 
-pytestmark = pytest.mark.skipif(
-    shutil.which("kicad-cli") is None
-    or subprocess.run([KICAD_PYTHON, "-c", "import pcbnew"], capture_output=True).returncode != 0,
-    reason="KiCad not installed",
-)
+pytestmark = needs_kicad
 
 
 @pytest.fixture
@@ -95,10 +92,9 @@ def test_netclass_wildcard_and_resize(board):
     assert r["resized_items"] == 0  # henüz iz yok
 
 
-@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file()
-                    or shutil.which("java") is None, reason="freerouting.jar/java missing")
+@needs_router
 def test_autoroute_end_to_end(board, monkeypatch):
-    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
     server.set_netclass(board, "POWER", ["VIN", "+3V3"], track_mm=0.5)
     r = server.autoroute(board, max_passes=50)
     assert r["unrouted_before"] > 0 and r["unrouted_after"] == 0 and r["tracks"] > 0
@@ -138,10 +134,9 @@ def test_route_net_with_via_and_errors(board):
         server.route_net(board, "VIN", "J1.1", "C1.1", [[105, 108, "B.Cu"]])
 
 
-@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file()
-                    or shutil.which("java") is None, reason="freerouting.jar/java missing")
+@needs_router
 def test_autoroute_keeps_hand_routes(board, monkeypatch):
-    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
     server.route_net(board, "GND", "J1.2", "D1.1",
                      [[106, 110.54], [106, 114, "B.Cu"], [115.06, 114], [115.06, 114.5, "F.Cu"]])
     before = _locked(board)
@@ -163,10 +158,9 @@ def test_drc_warns_when_project_rules_are_missing(board):
     assert "DEFAULT rules" in w and "ldo.kicad_pro" in w and "ldo.kicad_dru were skipped" in w
 
 
-@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file()
-                    or shutil.which("java") is None, reason="freerouting.jar/java missing")
+@needs_router
 def test_autoroute_writes_in_place_with_backup(board, monkeypatch):
-    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
     r = server.autoroute(board, max_passes=20)
     assert r["out"] == board and r["unrouted_after"] == 0
     assert list((Path(board).parent / ".pcbmcp_backups").glob("*ldo.kicad_pcb"))

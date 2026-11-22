@@ -1,14 +1,12 @@
 """Devre blokları: açma kuralları (saf) + sync ile uçtan uca."""
 import copy
 import json
-import shutil
-import subprocess
 
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from pcbmcp import blocks, design, library
-from pcbmcp.kicad import KICAD_PYTHON
+from pcbmcp import blocks, design
+from kicad_env import needs_kicad
 
 R = "Resistor_SMD:R_0805_2012Metric"
 LED_BLOCK = {"ports": ["VIN", "GND"], "parts": [
@@ -71,9 +69,7 @@ def test_patch_instances_and_blocks():
     assert [i["name"] for i in s["instances"]] == ["B"] and set(s["blocks"]) == {"led", "spare"}
 
 
-@pytest.mark.skipif(shutil.which("kicad-cli") is None or not library.SYM_DIR.is_dir()
-                    or subprocess.run([KICAD_PYTHON, "-c", "import pcbnew"], capture_output=True).returncode,
-                    reason="KiCad not installed")
+@needs_kicad
 def test_sync_with_blocks(tmp_path):
     j1 = {"ref": "J1", "symbol": "Connector_Generic:Conn_01x03",
           "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",

@@ -1,21 +1,15 @@
 """Spec -> şematik + PCB testleri (gerçek KiCad kütüphaneleri ve kicad-cli ile)."""
 import json
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from pcbmcp import design, library, sexpr, server
-from pcbmcp.kicad import KICAD_PYTHON
+from kicad_env import JAR, needs_kicad, needs_router
 
 ROOT = Path(__file__).resolve().parents[1]
-pytestmark = pytest.mark.skipif(
-    shutil.which("kicad-cli") is None or not library.SYM_DIR.is_dir()
-    or subprocess.run([KICAD_PYTHON, "-c", "import pcbnew"], capture_output=True).returncode != 0,
-    reason="KiCad not installed",
-)
+pytestmark = needs_kicad
 
 LED_SPEC = {
     "title": "LED", "board": {"width_mm": 20, "height_mm": 15},
@@ -148,9 +142,9 @@ def test_unconnected_pin_is_reported_by_erc(tmp_path):
     assert any(t["type"] == "pin_not_connected" for t in r["erc"]["types"])
 
 
-@pytest.mark.skipif(not (ROOT / "tools" / "freerouting.jar").is_file(), reason="no freerouting.jar")
+@needs_router
 def test_full_flow_to_fab(tmp_path, monkeypatch):
-    monkeypatch.setenv("FREEROUTING_JAR", str(ROOT / "tools" / "freerouting.jar"))
+    monkeypatch.setenv("FREEROUTING_JAR", str(JAR))
     r = design.sync(str(tmp_path), "led", LED_SPEC, None)
     pcb = r["files"]["pcb"]
     server.place_footprints(pcb, [

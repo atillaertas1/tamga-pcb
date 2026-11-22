@@ -10,7 +10,6 @@ from __future__ import annotations
 import copy
 import fnmatch
 import json
-import os
 import re
 from functools import lru_cache
 from pathlib import Path
