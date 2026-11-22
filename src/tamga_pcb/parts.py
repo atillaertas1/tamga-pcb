@@ -117,3 +117,48 @@ def search(query: str, package: str | None = None, basic_only: bool = False,
         out["hint"] = ("no match in jlcsearch (its catalogue misses some parts, e.g. CH340C). Search a known LCSC "
                        "code directly ('C84681'), a shorter part name, or a part type + value.")
     return out
+
+
+JLC_EXTENDED_FEE_USD = 3.0  # JLC'nin extended parça başına yükleme ücreti (yayımlanan; değişebilir)
+
+
+def lookup(code: str, client: httpx.Client) -> dict | None:
+    """'C84681' -> jlcsearch kaydı (tam eşleşme) ya da None."""
+    want = int(code.lstrip("Cc")) if code.lstrip("Cc").isdigit() else None
+    if want is None:
+        return None
+    r = client.get(f"{API}/components/list.json", params={"search": code, "limit": 20})
+    if r.status_code != 200:
+        return None
+    return next((c for c in r.json().get("components", []) if c.get("lcsc") == want), None)
+
+
+def bom_cost(rows: list[list[str]], boards: int = 5, client: httpx.Client | None = None) -> dict:
+    """BOM satırları [değer, 'R1,R2', footprint, lcsc] -> parça maliyeti ve JLC uyarıları (kart başına)."""
+    c = client or httpx.Client(timeout=20)
+    per_board, extended, unknown, low = 0.0, [], [], []
+    try:
+        for _val, refs, _fp, code in rows:
+            if not code:
+                continue
+            qty = len([r for r in refs.split(",") if r])
+            part = lookup(code, c)
+            if part is None:
+                unknown.append(code)
+                continue
+            price = _unit_price(part.get("price", part.get("price1")))
+            per_board += (price or 0.0) * qty
+            if not part.get("is_basic") and not part.get("is_preferred"):
+                extended.append(code)
+            stock = part.get("stock")
+            if stock is not None and stock < qty * boards:
+                low.append(f"{code} (stock {stock})")
+    except httpx.HTTPError as e:
+        raise ToolError(f"jlcsearch unavailable: {e}") from e
+    finally:
+        if client is None:
+            c.close()
+    return {"parts_usd_per_board": round(per_board, 3), "extended_parts": extended,
+            "extended_setup_usd": JLC_EXTENDED_FEE_USD * len(extended),
+            "not_in_catalogue": unknown, "low_stock": low,
+            "note": "Parts only, at the first price break; PCB, assembly and shipping come from JLC's quote."}

@@ -68,3 +68,20 @@ def test_basic_part_with_unknown_stock_is_kept():
     r = parts.search("5.1k", package="0603", basic_only=True, client=httpx.Client(transport=httpx.MockTransport(handler)))
     assert seen["path"] == "/resistors/list.json"
     assert r["parts"] and r["parts"][0].startswith("C23186 [B]") and "stock ?" in r["parts"][0]
+
+
+def test_bom_cost_sums_flags_extended_and_unknown():
+    catalogue = {
+        "C23186": {"lcsc": 23186, "price": "1-:0.002", "is_basic": True, "stock": None},
+        "C84681": {"lcsc": 84681, "price": "1-:0.50", "is_basic": False, "is_preferred": False, "stock": 4},
+    }
+
+    def handler(req):
+        code = req.url.params["search"]
+        return httpx.Response(200, json={"components": [catalogue[code]] if code in catalogue else []})
+    rows = [["5.1k", "R1,R2", "R_0603", "C23186"], ["CH340C", "U1", "SOIC-16", "C84681"],
+            ["?", "U2", "X", "C999999"], ["HDR", "J2", "PinHeader", ""]]
+    r = parts.bom_cost(rows, boards=5, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert r["parts_usd_per_board"] == 0.504
+    assert r["extended_parts"] == ["C84681"] and r["extended_setup_usd"] == 3.0
+    assert r["not_in_catalogue"] == ["C999999"] and r["low_stock"] == ["C84681 (stock 4)"]

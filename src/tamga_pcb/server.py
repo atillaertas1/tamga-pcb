@@ -275,9 +275,10 @@ def search_parts(query: str, package: str = "", basic_only: bool = False,
 # ------------------------------------------------------------------ çıktı
 
 @tool
-def export_fab(pcb_path: str, out_dir: str = "") -> dict:
+def export_fab(pcb_path: str, out_dir: str = "", extras: list[str] | None = None) -> dict:
     """Export a JLCPCB-ready package: gerbers+drill zip, BOM.csv, CPL.csv.
-    Run run_drc first; refuses nothing but reports parts missing an LCSC field."""
+    Run run_drc first; refuses nothing but reports parts missing an LCSC field.
+    extras: any of schematic_pdf, step (3D), odb (ODB++), ipc2581, cost (parts cost, extended parts, stock)."""
     pcb = abspath(pcb_path)
     out = Path(abspath(out_dir) if out_dir else str(Path(pcb).with_name("fab")))
     gdir = out / "gerbers"
@@ -300,7 +301,7 @@ def export_fab(pcb_path: str, out_dir: str = "") -> dict:
         w = csv.writer(f)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         w.writerows(t["cpl"])
-    return {
+    res = {
         "dir": str(out),
         "gerber_zip": str(zpath),
         "files": len(list(gdir.iterdir())),
@@ -308,6 +309,30 @@ def export_fab(pcb_path: str, out_dir: str = "") -> dict:
         "missing_lcsc": t["missing_lcsc"],
         "note": "JLC rotations may need per-footprint offsets; check CPL in their viewer.",
     }
+    stem = Path(pcb).stem
+    unknown = set(extras or []) - {"schematic_pdf", "step", "odb", "ipc2581", "cost"}
+    if unknown:
+        raise KicadError(f"unknown extras {sorted(unknown)}; use schematic_pdf, step, odb, ipc2581, cost")
+    for x in extras or []:
+        if x == "schematic_pdf":
+            sch = Path(pcb).with_suffix(".kicad_sch")
+            if not sch.is_file():
+                raise KicadError(f"no schematic next to the board ({sch.name})")
+            cli("sch", "export", "pdf", "-o", str(out / f"{stem}-schematic.pdf"), str(sch))
+            res["schematic_pdf"] = str(out / f"{stem}-schematic.pdf")
+        elif x == "step":
+            cli("pcb", "export", "step", "--force", "--subst-models", "--no-dnp",
+                "-o", str(out / f"{stem}.step"), pcb, timeout=600)
+            res["step"] = str(out / f"{stem}.step")
+        elif x == "odb":
+            cli("pcb", "export", "odb", "-o", str(out / f"{stem}-odb.zip"), pcb)
+            res["odb"] = str(out / f"{stem}-odb.zip")
+        elif x == "ipc2581":
+            cli("pcb", "export", "ipc2581", "-o", str(out / f"{stem}.xml"), pcb)
+            res["ipc2581"] = str(out / f"{stem}.xml")
+        elif x == "cost":
+            res["cost"] = parts_mod.bom_cost(t["bom"])
+    return res
 
 
 @tool
