@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -260,8 +261,9 @@ def cmd_add_zone(a: dict) -> dict:
         z.SetLocalClearance(pcbnew.FromMM(float(a.get("clearance_mm", 0.3))))
         z.SetMinThickness(pcbnew.FromMM(0.25))
         z.SetAssignedPriority(int(a.get("priority", 0)))
-        if poly:  # küçük pad'lerde thermal spoke'lar sığmaz -> tam bağlantı
-            z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+        # Bölge dökümü: küçük pad'lere thermal spoke sığmaz -> tam bağlantı. Tam kart dökümü: SMD pad'ler
+        # tam, delikli pad'ler thermal. Zone ayarı .kicad_dru'yu ezdiği için (starved_thermal) burada seçilir.
+        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL if poly else pcbnew.ZONE_CONNECTION_THT_THERMAL)
         ol = z.Outline()
         ol.NewOutline()
         for x, y in pts:
@@ -285,7 +287,25 @@ def cmd_export_dsn(a: dict) -> dict:
     ok = pcbnew.ExportSpecctraDSN(b, a["dsn"])
     if not ok:
         raise RuntimeError("ExportSpecctraDSN failed")
-    return {"dsn": a["dsn"]}
+    edge_um = b.GetDesignSettings().m_CopperEdgeClearance / 1000.0
+    return {"dsn": a["dsn"], "boundary_width_um": _widen_boundary(a["dsn"], edge_um)}
+
+
+def _widen_boundary(dsn_path: str, edge_um: float, margin_um: float = 20) -> float:
+    """KiCad kart sınırını 0 genişlikli path olarak yazar; Freerouting sınıra yalnız iz boşluğunu
+    (ör. 0.2) uygular, kartın kenar boşluğunu (ör. 0.3) bilmez -> copper_edge_clearance ihlali.
+    Sınır çizgisine 2*(kenar - boşluk + pay) genişlik ver: iz merkezden boşluk + yarı genişlik uzak
+    kalır, yani kenardan en az kenar boşluğu + pay. -> verilen genişlik (um)"""
+    with open(dsn_path, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"\(rule\s*\(width [\d.]+\)\s*\(clearance ([\d.]+)\)", text)
+    clearance = float(m.group(1)) if m else 200.0
+    width = round(max(0.0, 2 * (edge_um - clearance + margin_um)), 1)
+    if width > 0:
+        text = re.sub(r"(\(boundary\s*\(path \S+ )0 ", lambda mm: f"{mm.group(1)}{width:g} ", text)
+        with open(dsn_path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return width
 
 
 def cmd_import_ses(a: dict) -> dict:

@@ -36,3 +36,10 @@ def test_basic_only():
 def test_http_error_becomes_tool_error():
     with pytest.raises(ToolError):
         parts.search("10k", client=client({}, status=503))
+
+
+def test_rejected_query_passes_api_hint_through():
+    """jlcsearch tek terimli sorguyu 400 ile reddeder; 'unavailable' değil, API'nin önerisi dönmeli."""
+    hint = {"error": "Invalid search", "message": 'Add another search term, such as "8MHz crystal"'}
+    with pytest.raises(ToolError, match=r"rejected.*8MHz crystal.*resistor 5\.1k"):
+        parts.search("5.1k", client=client(hint, status=400))

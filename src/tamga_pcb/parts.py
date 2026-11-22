@@ -36,6 +36,13 @@ def search(query: str, package: str | None = None, basic_only: bool = False,
     c = client or httpx.Client(timeout=20)
     try:
         r = c.get(f"{API}/components/list.json", params=params)
+        if r.status_code == 400:  # sorgu reddi (ör. tek başına "5.1k"): API'nin önerisini modele ilet
+            try:
+                msg = r.json().get("message") or r.text
+            except ValueError:
+                msg = r.text
+            raise ToolError(f"search rejected for {query!r}: {msg[:300]} "
+                            "(add a part type, e.g. 'resistor 5.1k')")
         r.raise_for_status()
         comps = r.json().get("components", [])
     except (httpx.HTTPError, ValueError) as e:
