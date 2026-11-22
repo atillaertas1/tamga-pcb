@@ -41,6 +41,54 @@ xychart-beta
 Full step-by-step report of the clean run, with the context curve and every tool call:
 [examples/ch340-usb-uart/SESSION.md](../examples/ch340-usb-uart/SESSION.md).
 
+## Against another KiCad MCP server
+
+Same prompt, same model (`claude-sonnet-5-5`, pinned with `--model`), same appended instruction, same Freerouting
+2.5.0 jar, same machine and the same unrelated connectors loaded. The only difference is the KiCad tooling: the
+tamga-pcb plugin, or [mixelpixx/KiCAD-MCP-Server](https://github.com/mixelpixx/KiCAD-MCP-Server) (v2.9.0, commit
+`aa7dfe0`, the most-starred KiCad MCP server, built from source and connected with `--mcp-config`). Both boards were
+re-checked with KiCad's DRC afterwards.
+
+| | tamga-pcb | KiCAD-MCP-Server | |
+| --- | ---: | ---: | --- |
+| Cost (API list price) | **$0.51** | $0.98 | 48 % less |
+| Tokens read (all calls) | **1,501,640** | 3,743,343 | 60 % less |
+| Tokens written | **16,637** | 24,256 | 31 % less |
+| Largest context in one call | **64,345** | 106,806 | 40 % less |
+| Context at the start | 26,328 | 24,959 | about the same |
+| API calls | **28** | 50 | 44 % less |
+| Tool calls | **48** (0 errors) | 84 (5 errors: 2 blocked shell commands, 2 invalid tool arguments, 1 failed direct edit of a KiCad file) | 43 % less |
+| All tool results together | **16,785 chars** | 71,997 chars | 77 % less |
+| Wall time | **3 min 06 s** | 4 min 48 s | 35 % less |
+| Result | DRC clean, fab files | DRC clean, fab files | both finished |
+| LCSC numbers | looked up in JLC's catalogue | from memory (local parts DB not downloaded) |  |
+
+```mermaid
+xychart-beta
+    title "tamga-pcb (left bar) vs KiCAD-MCP-Server (right bar), lower is better"
+    x-axis ["API calls", "Tool calls", "Peak context (k tokens)", "Tool results (k chars)", "Cost (US cents)"]
+    y-axis 0 --> 117
+    bar [28, 48, 64, 17, 51]
+    bar [50, 84, 107, 72, 98]
+```
+
+**What this does and doesn't show**
+- Both tools got the job done; KiCAD-MCP-Server covers far more of KiCad (229 tools: hierarchical sheets, symbol
+  creation, IPC-2581 and ODB++ export, an experimental live-editing backend…). This measures one thing: the same small board, end to end, unattended.
+- Its 258 registered tool schemas are about 288k characters against tamga-pcb's 13k, but Claude Code defers MCP tools
+  until they are needed, so both sessions **start** at about 25k tokens. The gap opens during the work: tamga-pcb's
+  answers are shorter (about 350 characters per call against about 860) and the job takes fewer calls, and every
+  call re-reads everything before it.
+- Its JLCPCB part search needs a local database download (`download_jlcpcb.py`) that was not run, so it chose LCSC
+  numbers from memory; with the database its run would have looked different, in calls and in part choice.
+- One run each, which is a measurement, not a statistic: models and Freerouting are not deterministic, and a
+  second run of either would give different numbers.
+- With `claude-opus-5-5` (its first run, before the model was pinned) KiCAD-MCP-Server took 36 API calls,
+  56 tool calls and $1.44, finishing with 0 DRC errors and 2 silkscreen warnings.
+
+Raw numbers: [tamga-pcb](../examples/ch340-usb-uart/session-metrics.json),
+[KiCAD-MCP-Server, Sonnet](data/kicad-mcp-server-sonnet.json), [KiCAD-MCP-Server, Opus](data/kicad-mcp-server-opus.json).
+
 ## ESP32-C3 USB-C dev board
 
 <p align="center"><img src="../assets/examples/esp32c3-3d.png" alt="ESP32-C3 dev board in 3D" width="60%" /></p>

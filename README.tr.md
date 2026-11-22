@@ -55,7 +55,7 @@ araçlar tek satırlık özetlerle cevap verir.
   </tr>
 </table>
 
-Token, maliyet, süre ve ilk denemenin öğrettikleri: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Token, maliyet, süre ve ilk denemenin öğrettikleri: [docs/BENCHMARKS.md](docs/BENCHMARKS.md). Aynı prompt ve aynı modelle en çok yıldızlı KiCad MCP sunucusu da kartı bitirdi; tamga-pcb %48 daha az maliyet, %43 daha az araç çağrısı ve %40 daha küçük en yüksek bağlamla yaptı (her biri tek koşu, [ayrıntılar](docs/BENCHMARKS.md#against-another-kicad-mcp-server)).
 
 ## Kurulum
 

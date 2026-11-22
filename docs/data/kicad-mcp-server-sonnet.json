@@ -1,0 +1,353 @@
+{
+ "model": "claude-sonnet-5-5",
+ "claude_code_version": "2.1.330",
+ "tools_available": 289,
+ "mcp_servers_loaded": 1,
+ "num_turns": 85,
+ "api_calls": 50,
+ "tool_calls": 84,
+ "tool_errors": 5,
+ "tools": {
+  "mcp__kicad__add_copper_pour": 6,
+  "Grep": 6,
+  "mcp__kicad__refill_zones": 5,
+  "mcp__kicad__run_drc": 5,
+  "mcp__kicad__open_board": 4,
+  "mcp__kicad__save_board": 4,
+  "mcp__kicad__create_board_from_schematic": 3,
+  "mcp__kicad__add_board_outline": 3,
+  "mcp__kicad__batch_move_components": 3,
+  "mcp__kicad__autoroute": 3,
+  "Read": 3,
+  "mcp__kicad__set_design_rules": 3,
+  "Edit": 3,
+  "ToolSearch": 2,
+  "Bash": 2,
+  "mcp__kicad__search_symbols": 2,
+  "mcp__kicad__search_footprints": 2,
+  "mcp__kicad__list_symbol_pins": 2,
+  "mcp__kicad__add_schematic_component": 2,
+  "mcp__kicad__connect_to_net": 2,
+  "mcp__kicad__reload_board": 2,
+  "mcp__kicad__create_project": 1,
+  "mcp__kicad__get_jlcpcb_database_stats": 1,
+  "mcp__kicad__get_footprint_info": 1,
+  "mcp__kicad__batch_add_components": 1,
+  "mcp__kicad__batch_connect": 1,
+  "mcp__kicad__batch_add_no_connects": 1,
+  "mcp__kicad__run_erc": 1,
+  "mcp__kicad__get_component_pads": 1,
+  "mcp__kicad__check_freerouting": 1,
+  "mcp__kicad__edit_schematic_component": 1,
+  "mcp__kicad__get_design_rules": 1,
+  "mcp__kicad__query_zones": 1,
+  "mcp__kicad__export_gerbers": 1,
+  "mcp__kicad__export_drill": 1,
+  "mcp__kicad__export_position_file": 1,
+  "mcp__kicad__export_bom": 1,
+  "Write": 1
+ },
+ "tool_result_chars": {
+  "mcp__kicad__create_board_from_schematic": 16643,
+  "mcp__kicad__autoroute": 9853,
+  "Read": 7797,
+  "Grep": 5319,
+  "mcp__kicad__batch_move_components": 4704,
+  "mcp__kicad__get_component_pads": 4289,
+  "mcp__kicad__run_drc": 3827,
+  "mcp__kicad__save_board": 2368,
+  "mcp__kicad__add_copper_pour": 1776,
+  "mcp__kicad__search_footprints": 1758,
+  "mcp__kicad__open_board": 1571,
+  "mcp__kicad__list_symbol_pins": 1174,
+  "mcp__kicad__set_design_rules": 1153,
+  "mcp__kicad__query_zones": 878,
+  "mcp__kicad__get_footprint_info": 856,
+  "mcp__kicad__add_board_outline": 750,
+  "mcp__kicad__refill_zones": 685,
+  "mcp__kicad__create_project": 651,
+  "mcp__kicad__connect_to_net": 617,
+  "mcp__kicad__check_freerouting": 601,
+  "mcp__kicad__reload_board": 594,
+  "Edit": 541,
+  "mcp__kicad__export_drill": 497,
+  "mcp__kicad__export_gerbers": 415,
+  "mcp__kicad__get_design_rules": 393,
+  "mcp__kicad__search_symbols": 330,
+  "mcp__kicad__batch_connect": 327,
+  "Bash": 311,
+  "mcp__kicad__export_bom": 282,
+  "Write": 244,
+  "mcp__kicad__export_position_file": 209,
+  "mcp__kicad__get_jlcpcb_database_stats": 191,
+  "mcp__kicad__add_schematic_component": 110,
+  "mcp__kicad__edit_schematic_component": 93,
+  "mcp__kicad__batch_add_components": 91,
+  "mcp__kicad__run_erc": 60,
+  "mcp__kicad__batch_add_no_connects": 39,
+  "ToolSearch": 0
+ },
+ "tokens": {
+  "input": 100,
+  "cache_write": 92900,
+  "cache_read": 3650343,
+  "output": 24256
+ },
+ "cost_usd": 0.9793942999999998,
+ "duration_s": 288,
+ "api_duration_s": 223,
+ "is_error": false,
+ "final_message": "The board is routed and DRC-clean (0 violations, schematic parity included), and the fab files are exported. The LCSC part numbers in the BOM are from memory and still need checking. The local JLCPCB parts database was empty, so I couldn't confirm stock or basic/extended status. ERC on the schematic is also clean.\n\nThe project is in `ch340/`. The board is 35 × 20 mm, two layers, with a GND pour on both sides.\n\n**Fab files** in `ch340/fab/`:\n- `gerbers/` holds the Gerbers for both copper layers, mask, paste, silk and edge cuts, the `.gbrjob`, and PTH/NPTH Excellon drills with drill maps.\n- `ch340_cpl.csv` is the pick-and-place file.\n- `ch340_bom_jlcpcb.csv` is the BOM with LCSC numbers.\n- `ch340_bom_raw.csv` is KiCad's own BOM export.\n\n**Design choices I made**\n- **Power:** VBUS is wired straight to header VCC, 5 V with no fuse or regulator. The CH340C runs from the 5 V supply, with a 100 nF cap on the V3 pin and 100 nF plus 10 µF on VBUS.\n- **USB-C:** HRO TYPE-C-31-M-12. D+ and D− are tied across both connector orientations, and 5.1 kΩ pull-downs on CC1 and CC2 make it work with C-to-C cables. Unused SBU pins are marked no-connect.\n- **Header:** it is the vertical 1×6 footprint, in the order you gave: GND, CTS, VCC, TXD, RXD, DTR. TXD is the CH340 output and RXD is its input, as on an FTDI cable, so wire it to your target's RX and TX respectively.\n- **LEDs:** each is 1 kΩ from VBUS to the LED, with its cathode on the TXD or RXD line. The lines idle high, so the LED lights when the line goes low. I assumed red for TX and green for RX.\n- **Not connected:** DSR, RI, DCD, RTS and R232 are unconnected.\n- **Placement:** the connector mouth sits 0.1 mm inside the board edge. I shifted it in to clear a silkscreen-edge warning.\n\n**Rule changes you should know about**\n- I lowered the project's minimum track width from 0.2 to 0.15 mm, because the autorouter used 0.15 mm segments. That is still above JLCPCB's limit. The VBUS, CC and USB data traces are 0.15 mm in places.\n- I changed the front GND pour to solid pad connections. The thermal relief starved two shield pads on the USB-C connector.\n\n**To check before ordering**\n- The LCSC numbers need verifying against the JLCPCB parts library. I believe the resistors, capacitors and LEDs are basic and that the CH340C, USB-C connector and 10 µF cap are extended.\n- The pin header is not in the BOM. Hand-solder it, or add a header part (I believe C124378 is the vertical 1×6) if you want it assembled.\n- I haven't looked at the board in a viewer. DRC passes, but a visual check of the 3D view and silkscreen is worth doing.",
+ "per_call": [
+  {
+   "call": 1,
+   "context_tokens": 24959,
+   "output_tokens": 8
+  },
+  {
+   "call": 2,
+   "context_tokens": 33864,
+   "output_tokens": 7
+  },
+  {
+   "call": 3,
+   "context_tokens": 34746,
+   "output_tokens": 8
+  },
+  {
+   "call": 4,
+   "context_tokens": 36513,
+   "output_tokens": 7
+  },
+  {
+   "call": 5,
+   "context_tokens": 37290,
+   "output_tokens": 32
+  },
+  {
+   "call": 6,
+   "context_tokens": 38215,
+   "output_tokens": 8
+  },
+  {
+   "call": 7,
+   "context_tokens": 39978,
+   "output_tokens": 4
+  },
+  {
+   "call": 8,
+   "context_tokens": 40986,
+   "output_tokens": 8
+  },
+  {
+   "call": 9,
+   "context_tokens": 49817,
+   "output_tokens": 33
+  },
+  {
+   "call": 10,
+   "context_tokens": 50869,
+   "output_tokens": 28
+  },
+  {
+   "call": 11,
+   "context_tokens": 51719,
+   "output_tokens": 24
+  },
+  {
+   "call": 12,
+   "context_tokens": 51933,
+   "output_tokens": 47
+  },
+  {
+   "call": 13,
+   "context_tokens": 55343,
+   "output_tokens": 5
+  },
+  {
+   "call": 14,
+   "context_tokens": 58573,
+   "output_tokens": 3
+  },
+  {
+   "call": 15,
+   "context_tokens": 62506,
+   "output_tokens": 55
+  },
+  {
+   "call": 16,
+   "context_tokens": 64177,
+   "output_tokens": 3
+  },
+  {
+   "call": 17,
+   "context_tokens": 65900,
+   "output_tokens": 8
+  },
+  {
+   "call": 18,
+   "context_tokens": 66195,
+   "output_tokens": 32
+  },
+  {
+   "call": 19,
+   "context_tokens": 66625,
+   "output_tokens": 24
+  },
+  {
+   "call": 20,
+   "context_tokens": 67198,
+   "output_tokens": 20
+  },
+  {
+   "call": 21,
+   "context_tokens": 70682,
+   "output_tokens": 8
+  },
+  {
+   "call": 22,
+   "context_tokens": 72488,
+   "output_tokens": 8
+  },
+  {
+   "call": 23,
+   "context_tokens": 76128,
+   "output_tokens": 3
+  },
+  {
+   "call": 24,
+   "context_tokens": 76944,
+   "output_tokens": 8
+  },
+  {
+   "call": 25,
+   "context_tokens": 78660,
+   "output_tokens": 8
+  },
+  {
+   "call": 26,
+   "context_tokens": 80403,
+   "output_tokens": 32
+  },
+  {
+   "call": 27,
+   "context_tokens": 80993,
+   "output_tokens": 58
+  },
+  {
+   "call": 28,
+   "context_tokens": 81591,
+   "output_tokens": 24
+  },
+  {
+   "call": 29,
+   "context_tokens": 82161,
+   "output_tokens": 8
+  },
+  {
+   "call": 30,
+   "context_tokens": 83457,
+   "output_tokens": 7
+  },
+  {
+   "call": 31,
+   "context_tokens": 84742,
+   "output_tokens": 3
+  },
+  {
+   "call": 32,
+   "context_tokens": 85749,
+   "output_tokens": 24
+  },
+  {
+   "call": 33,
+   "context_tokens": 86349,
+   "output_tokens": 3
+  },
+  {
+   "call": 34,
+   "context_tokens": 89087,
+   "output_tokens": 3
+  },
+  {
+   "call": 35,
+   "context_tokens": 94101,
+   "output_tokens": 24
+  },
+  {
+   "call": 36,
+   "context_tokens": 96089,
+   "output_tokens": 24
+  },
+  {
+   "call": 37,
+   "context_tokens": 97770,
+   "output_tokens": 32
+  },
+  {
+   "call": 38,
+   "context_tokens": 98330,
+   "output_tokens": 32
+  },
+  {
+   "call": 39,
+   "context_tokens": 98928,
+   "output_tokens": 60
+  },
+  {
+   "call": 40,
+   "context_tokens": 99507,
+   "output_tokens": 8
+  },
+  {
+   "call": 41,
+   "context_tokens": 100337,
+   "output_tokens": 3
+  },
+  {
+   "call": 42,
+   "context_tokens": 100897,
+   "output_tokens": 8
+  },
+  {
+   "call": 43,
+   "context_tokens": 101746,
+   "output_tokens": 5
+  },
+  {
+   "call": 44,
+   "context_tokens": 102325,
+   "output_tokens": 50
+  },
+  {
+   "call": 45,
+   "context_tokens": 102778,
+   "output_tokens": 24
+  },
+  {
+   "call": 46,
+   "context_tokens": 103011,
+   "output_tokens": 32
+  },
+  {
+   "call": 47,
+   "context_tokens": 103584,
+   "output_tokens": 24
+  },
+  {
+   "call": 48,
+   "context_tokens": 104123,
+   "output_tokens": 2
+  },
+  {
+   "call": 49,
+   "context_tokens": 106171,
+   "output_tokens": 8
+  },
+  {
+   "call": 50,
+   "context_tokens": 106806,
+   "output_tokens": 873
+  }
+ ]
+}

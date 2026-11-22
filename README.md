@@ -55,7 +55,7 @@ raw KiCad files: tools answer in one-line summaries, so a whole board fits comfo
   </tr>
 </table>
 
-Token counts, cost, time and what the first attempt taught us: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Token counts, cost, time and what the first attempt taught us: [docs/BENCHMARKS.md](docs/BENCHMARKS.md). On the same prompt with the same model, the most-starred KiCad MCP server also finished the board; tamga-pcb used 48 % less money, 43 % fewer tool calls and 40 % less peak context (one run each, [details](docs/BENCHMARKS.md#against-another-kicad-mcp-server)).
 
 ## Install
 
