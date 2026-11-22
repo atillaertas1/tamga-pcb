@@ -292,7 +292,7 @@ def cmd_add_zone(a: dict) -> dict:
         for z in list(b.Zones()):
             if (not z.GetIsRuleArea() and z.GetNetname() == a["net"] and z.GetAssignedPriority() == int(a.get("priority", 0))
                     and z.GetLayerName() in layers):
-                b.Remove(z)
+                b.Delete(z)
                 replaced += 1
     for lname in layers:
         z = pcbnew.ZONE(b)
@@ -303,7 +303,10 @@ def cmd_add_zone(a: dict) -> dict:
         z.SetAssignedPriority(int(a.get("priority", 0)))
         # Bölge dökümü: küçük pad'lere thermal spoke sığmaz -> tam bağlantı. Tam kart dökümü: SMD pad'ler
         # tam, delikli pad'ler thermal. Zone ayarı .kicad_dru'yu ezdiği için (starved_thermal) burada seçilir.
-        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL if poly else pcbnew.ZONE_CONNECTION_THT_THERMAL)
+        # İç katman düzlemi: delikli pad'lerin thermal kolları komşu delik boşluklarına sığmıyor
+        # (starved_thermal) -> düzlemde tam bağlantı.
+        inner = lname not in ("F.Cu", "B.Cu")
+        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL if poly or inner else pcbnew.ZONE_CONNECTION_THT_THERMAL)
         ol = z.Outline()
         ol.NewOutline()
         for x, y in pts:
@@ -334,7 +337,7 @@ def cmd_export_dsn(a: dict) -> dict:
         # SES içe aktarımı kartın rotasını oturumla değiştirir; kilitli route_net izleri korunur.
         for t in list(b.GetTracks()):
             if not t.IsLocked():
-                b.Remove(t)
+                b.Delete(t)
                 ripped += 1
     ok = pcbnew.ExportSpecctraDSN(b, a["dsn"])
     if not ok:
@@ -525,28 +528,161 @@ def _edge_rect(b, x0: float, y0: float, w: float, h: float) -> None:
         b.Add(s)
 
 
-def _resize_board(b, w: float, h: float) -> str | None:
-    """Kenar 4 düz segmentten oluşan dikdörtgense sol-üst köşeyi koruyup boyutu değiştir.
-    Başka şekilli kenarlara dokunmaz (None döner)."""
+def _seg(b, ax, ay, bx, by) -> None:
+    s = pcbnew.PCB_SHAPE(b)
+    s.SetShape(pcbnew.SHAPE_T_SEGMENT)
+    s.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(ax), pcbnew.FromMM(ay)))
+    s.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(bx), pcbnew.FromMM(by)))
+    s.SetLayer(pcbnew.Edge_Cuts)
+    s.SetWidth(pcbnew.FromMM(0.1))
+    b.Add(s)
+
+
+def _arc(b, start, mid, end) -> None:
+    s = pcbnew.PCB_SHAPE(b)
+    s.SetShape(pcbnew.SHAPE_T_ARC)
+    v = lambda p: pcbnew.VECTOR2I(pcbnew.FromMM(p[0]), pcbnew.FromMM(p[1]))  # noqa: E731
+    s.SetArcGeometry(v(start), v(mid), v(end))
+    s.SetLayer(pcbnew.Edge_Cuts)
+    s.SetWidth(pcbnew.FromMM(0.1))
+    b.Add(s)
+
+
+def _draw_outline(b, x0: float, y0: float, board: dict) -> tuple[int, int]:
+    """Kart kenarı: outline_mm çokgeni (sol üst köşeye göre) ya da (yuvarlak köşeli) dikdörtgen.
+    -> (segment, yay) sayısı"""
+    w, h = float(board.get("width_mm", 50)), float(board.get("height_mm", 40))
+    if board.get("outline_mm"):
+        pts = [(x0 + float(x), y0 + float(y)) for x, y in board["outline_mm"]]
+        for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
+            _seg(b, ax, ay, bx, by)
+        return len(pts), 0
+    r = min(float(board.get("corner_radius_mm", 0)), w / 2, h / 2)
+    if r <= 0:
+        _edge_rect(b, x0, y0, w, h)
+        return 4, 0
+    k = r * (1 - 0.7071067811865476)
+    x1, y1 = x0 + w, y0 + h
+    _seg(b, x0 + r, y0, x1 - r, y0)
+    _seg(b, x1, y0 + r, x1, y1 - r)
+    _seg(b, x1 - r, y1, x0 + r, y1)
+    _seg(b, x0, y1 - r, x0, y0 + r)
+    _arc(b, (x0, y0 + r), (x0 + k, y0 + k), (x0 + r, y0))
+    _arc(b, (x1 - r, y0), (x1 - k, y0 + k), (x1, y0 + r))
+    _arc(b, (x1, y1 - r), (x1 - k, y1 - k), (x1 - r, y1))
+    _arc(b, (x0 + r, y1), (x0 + k, y1 - k), (x0, y1 - r))
+    return 4, 4
+
+
+def _apply_outline(b, board: dict) -> str | None:
+    """Spec'teki kart şekli mevcuttan farklıysa kenarı sol üst köşeyi koruyarak yeniden çiz.
+    Elle çizilmiş (daire, eğri içeren) kenarlara dokunmaz."""
     edges = [d for d in b.GetDrawings() if d.GetLayer() == pcbnew.Edge_Cuts]
     bb = b.GetBoardEdgesBoundingBox()
-    cur_w, cur_h = round(mm(bb.GetWidth()), 2), round(mm(bb.GetHeight()), 2)
-    if abs(cur_w - w) < 0.2 and abs(cur_h - h) < 0.2:  # çizgi kalınlığı payı
+    cur_w, cur_h = round(mm(bb.GetWidth()) - 0.1, 2), round(mm(bb.GetHeight()) - 0.1, 2)
+    segs = sum(1 for d in edges if d.GetShape() == pcbnew.SHAPE_T_SEGMENT)
+    arcs = sum(1 for d in edges if d.GetShape() == pcbnew.SHAPE_T_ARC)
+    cur_r = next((mm(d.GetRadius()) for d in edges if d.GetShape() == pcbnew.SHAPE_T_ARC), 0.0)
+    if board.get("outline_mm"):
+        xs = [float(x) for x, _ in board["outline_mm"]]
+        ys = [float(y) for _, y in board["outline_mm"]]
+        want = (len(board["outline_mm"]), 0, max(xs) - min(xs), max(ys) - min(ys))
+    else:
+        want = (4, 4 if float(board.get("corner_radius_mm", 0)) > 0 else 0,
+                float(board.get("width_mm", 50)), float(board.get("height_mm", 40)))
+    want_r = 0.0 if board.get("outline_mm") else min(float(board.get("corner_radius_mm", 0)), want[2] / 2, want[3] / 2)
+    if ((segs, arcs) == want[:2] and abs(cur_w - want[2]) < 0.2 and abs(cur_h - want[3]) < 0.2
+            and abs(cur_r - want_r) < 0.05):
         return None
-    if len(edges) != 4 or any(d.GetShape() != pcbnew.SHAPE_T_SEGMENT for d in edges):
-        return "board outline is not a simple rectangle; resize skipped"
-    x0 = mm(bb.GetLeft()) + 0.05
-    y0 = mm(bb.GetTop()) + 0.05
+    if len(edges) != segs + arcs:
+        return "board outline has hand-drawn shapes; outline from spec skipped"
+    x0, y0 = mm(bb.GetLeft()) + 0.05, mm(bb.GetTop()) + 0.05
     for d in edges:
-        b.Remove(d)
-    _edge_rect(b, x0, y0, w, h)
-    return f"board resized {cur_w:.1f}x{cur_h:.1f} -> {w:.1f}x{h:.1f} mm"
+        b.Delete(d)
+    _draw_outline(b, x0, y0, board)
+    shape = "polygon" if board.get("outline_mm") else f"r{want_r:g}" if want_r else "rect"
+    return f"board outline -> {want[2]:.1f}x{want[3]:.1f} mm {shape}"
 
 
-def _new_board(path: str, w: float, h: float):
-    """Boş kart: Edge.Cuts dikdörtgeni (100,100)'den başlar + JLCPCB standart kuralları."""
+def _apply_layers(b, n: int) -> str | None:
+    """2/4/6 bakır katman. İç katmanlar güç düzlemi: Freerouting onlara iz çizmez, GND/besleme dökülür."""
+    if n not in (2, 4, 6):
+        raise ValueError(f"layers must be 2, 4 or 6, not {n}")
+    note = None
+    if b.GetCopperLayerCount() != n:
+        if n < b.GetCopperLayerCount() and any(
+                t.GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu) for t in b.GetTracks() if t.GetClass() == "PCB_TRACK"):
+            raise ValueError("inner layers carry tracks; remove them before reducing the layer count")
+        note = f"copper layers {b.GetCopperLayerCount()} -> {n}"
+        b.SetCopperLayerCount(n)
+    for i in range(1, n - 1):
+        lid = b.GetLayerID(f"In{i}.Cu")
+        if b.GetLayerType(lid) != pcbnew.LT_POWER:
+            b.SetLayerType(lid, pcbnew.LT_POWER)
+    return note
+
+
+HOLE_FP = {2.2: "M2", 2.7: "M2.5", 3.2: "M3", 4.3: "M4"}
+
+
+def _apply_board_items(b, board: dict) -> list[str]:
+    """Spec'ten montaj delikleri ve silk yazıları; 'tamga:board' grubunda, her senkronda yeniden üretilir."""
+    bb = b.GetBoardEdgesBoundingBox()  # silmeden önce: sonra SWIG tipi kayboluyor
+    x0, y0 = mm(bb.GetLeft()) + 0.05, mm(bb.GetTop()) + 0.05
+    w, h = mm(bb.GetWidth()) - 0.1, mm(bb.GetHeight()) - 0.1
+    # Remove() öğeyi sahipsiz bırakıyor ve sonraki SWIG çağrıları (FootprintLoad...) bozuluyor: Delete()
+    for g in [g for g in b.Groups() if g.GetName() == "tamga:board"]:
+        for it in list(g.GetItems()):
+            b.Delete(it)
+        b.Delete(g)
+    items, made = [], []
+    mh = board.get("mounting_holes")
+    if mh:
+        d = float(mh.get("diameter_mm", 3.2))
+        if d not in HOLE_FP:
+            raise ValueError(f"mounting hole diameter {d} mm: use one of {sorted(HOLE_FP)} (M2, M2.5, M3, M4)")
+        fid = f"MountingHole:MountingHole_{d:g}mm_{HOLE_FP[d]}{'_Pad' if mh.get('plated') else ''}"
+        inset = float(mh.get("inset_mm", 3.5))
+        pts = mh.get("at_mm") or [(inset, inset), (w - inset, inset), (w - inset, h - inset), (inset, h - inset)]
+        for i, (x, y) in enumerate(pts, 1):
+            fp = _load_fp(fid)
+            fp.SetReference(f"MH{i}")
+            fp.Reference().SetVisible(False)
+            fp.SetValue(f"{HOLE_FP[d]} hole")
+            fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x0 + float(x)), pcbnew.FromMM(y0 + float(y))))
+            fp.SetAttributes(fp.GetAttributes() | pcbnew.FP_BOARD_ONLY | pcbnew.FP_EXCLUDE_FROM_BOM
+                             | pcbnew.FP_EXCLUDE_FROM_POS_FILES)
+            b.Add(fp)
+            items.append(fp)
+        made.append(f"{len(pts)} x {HOLE_FP[d]} holes")
+    for t in board.get("silk") or []:
+        txt = pcbnew.PCB_TEXT(b)
+        txt.SetText(str(t["text"]))
+        back = str(t.get("layer", "F")).upper().startswith("B")
+        txt.SetLayer(pcbnew.B_SilkS if back else pcbnew.F_SilkS)
+        size = pcbnew.FromMM(float(t.get("size_mm", 1.0)))
+        txt.SetTextSize(pcbnew.VECTOR2I(size, size))
+        txt.SetTextThickness(max(pcbnew.FromMM(0.15), int(size * 0.15)))
+        txt.SetMirrored(back)
+        txt.SetTextAngleDegrees(float(t.get("rot", 0)))
+        txt.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x0 + float(t["x"])), pcbnew.FromMM(y0 + float(t["y"]))))
+        b.Add(txt)
+        items.append(txt)
+    if board.get("silk"):
+        made.append(f"{len(board['silk'])} silk texts")
+    if items:
+        g = pcbnew.PCB_GROUP(b)
+        g.SetName("tamga:board")
+        b.Add(g)
+        for it in items:
+            g.AddItem(it)
+    return made
+
+
+def _new_board(path: str, board: dict):
+    """Boş kart: kenar (100,100)'den başlar + JLCPCB standart kuralları."""
     b = pcbnew.NewBoard(path)
-    _edge_rect(b, 100.0, 100.0, w, h)
+    _draw_outline(b, 100.0, 100.0, board)
     ds = b.GetDesignSettings()
     ds.m_TrackMinWidth = pcbnew.FromMM(0.127)
     ds.m_MinClearance = pcbnew.FromMM(0.127)
@@ -587,12 +723,13 @@ def cmd_sync_pcb(a: dict) -> dict:
     path = a["pcb"]
     created = not os.path.isfile(path)
     resized = None
+    board = a.get("board") or {}
     if created:
-        b = _new_board(path, float(a["board"].get("width_mm", 50)), float(a["board"].get("height_mm", 40)))
+        b = _new_board(path, board)
     else:
         b = load(path)
-        resized = _resize_board(b, float(a["board"].get("width_mm", 50)),
-                                float(a["board"].get("height_mm", 40))) if a.get("board") else None
+        resized = _apply_outline(b, board) if board else None
+    layer_note = _apply_layers(b, int(board.get("layers", b.GetCopperLayerCount())))
 
     # Bakır taşıyan netler (iz/via/döküm): senkron sonrası pad'siz kalırsa ad değişmiş/silinmiş demek
     copper_nets = {t.GetNetname() for t in b.GetTracks()} | {z.GetNetname() for z in b.Zones()}
@@ -617,7 +754,7 @@ def cmd_sync_pcb(a: dict) -> dict:
         if fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
             continue
         if ref not in want:
-            b.Remove(fp)
+            b.Delete(fp)
             removed.append(ref)
 
     bb = b.GetBoardEdgesBoundingBox()
@@ -642,7 +779,7 @@ def cmd_sync_pcb(a: dict) -> dict:
                 fp.SetOrientation(old.GetOrientation())
                 if old.IsFlipped():
                     fp.Flip(fp.GetPosition(), pcbnew.FLIP_DIRECTION_LEFT_RIGHT)
-                b.Remove(old)
+                b.Delete(old)
                 replaced.append(ref)
             else:  # yeni: kart içinde ızgaraya diz
                 fbb = fp.GetBoundingBox(False)
@@ -673,10 +810,15 @@ def cmd_sync_pcb(a: dict) -> dict:
             else:
                 pad.SetNetCode(0)
 
+    board_items = _apply_board_items(b, board)
     bk = None if created else backup(path)
     pcbnew.SaveBoard(path, b)
     out = {"pcb": path, "created": created, "added": added, "updated": len(updated),
            "replaced": replaced, "removed": removed, "unrouted": unrouted(b)}
+    if board_items:
+        out["board_items"] = board_items
+    if layer_note:
+        out["layers"] = layer_note
     if resized:
         out["resized"] = resized
     pad_nets = {pad.GetNetname() for f in b.GetFootprints() for pad in f.Pads()}

@@ -95,7 +95,9 @@ def sync_design(project_dir: str, name: str, spec: dict | None = None,
                 patch: dict | None = None) -> dict:
     """Create/update schematic + PCB from a circuit spec (single source of truth,
     saved as <name>.circuit.json). PCB placement/routing of existing parts is preserved.
-    spec: {title?, board:{width_mm,height_mm}, parts:[{ref, symbol:'Lib:Name',
+    spec: {title?, board:{width_mm, height_mm, corner_radius_mm?, outline_mm?:[[x,y],..], layers?:2|4|6,
+      mounting_holes?:{diameter_mm:2.2|2.7|3.2|4.3, inset_mm?, at_mm?, plated?}, silk?:[{text,x,y,size_mm?,layer?:F|B}]},
+      parts:[{ref, symbol:'Lib:Name',
       footprint:'Lib:Name', value?, lcsc?, dnp?, pins:{pin_number_or_name: net}, nc?:[pins]|'*'}]}
     patch (instead of spec, for edits): {parts:[partial parts merged by ref], remove:[refs]}.
     Blocks (reusable subcircuits): spec.blocks {name:{ports:[..], parts:[..]}} + spec.instances
@@ -283,7 +285,12 @@ def export_fab(pcb_path: str, out_dir: str = "", extras: list[str] | None = None
     out = Path(abspath(out_dir) if out_dir else str(Path(pcb).with_name("fab")))
     gdir = out / "gerbers"
     gdir.mkdir(parents=True, exist_ok=True)
-    cli("pcb", "export", "gerbers", "--subtract-soldermask", "--check-zones", "-o", str(gdir) + "/", pcb)
+    # Yalnız üretimde kullanılan katmanlar (varsayılan dışa aktarma Adhesive/Courtyard/Fab da yazıyor)
+    n = run_worker("summary", {"pcb": pcb, "max_footprints": 0})["copper_layers"]
+    copper = ["F.Cu", *(f"In{i}.Cu" for i in range(1, n - 1)), "B.Cu"]
+    layers = copper + ["F.Paste", "B.Paste", "F.Silkscreen", "B.Silkscreen", "F.Mask", "B.Mask", "Edge.Cuts"]
+    cli("pcb", "export", "gerbers", "--subtract-soldermask", "--check-zones", "--layers", ",".join(layers),
+        "-o", str(gdir) + "/", pcb)
     cli("pcb", "export", "drill", "--format", "excellon", "--excellon-separate-th",
         "-u", "mm", "--generate-map", "--map-format", "gerberx2", "-o", str(gdir) + "/", pcb)
 

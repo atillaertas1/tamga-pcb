@@ -230,3 +230,25 @@ def test_move_after_routing_then_reroute_is_clean(tmp_path, monkeypatch):
     assert r["ripped_up"] > 0 and r["unrouted_after"] == 0
     assert server.add_copper_zone(pcb).get("replaced_zones") == 2
     assert server.run_drc(pcb, schematic_parity=True).get("verdict") == "CLEAN"
+
+
+def test_board_shape_layers_holes_and_silk(tmp_path):
+    """Yuvarlak köşe, 4 katman (iç katmanlar güç düzlemi), köşelerde montaj delikleri, silk yazısı;
+    tekrar senkron kopya üretmez, şekil değişince kenar yeniden çizilir."""
+    spec = json.loads(json.dumps(LED_SPEC))
+    spec["board"] = {"width_mm": 34, "height_mm": 22, "corner_radius_mm": 2.5, "layers": 4,
+                     "mounting_holes": {"diameter_mm": 2.7, "inset_mm": 3},
+                     "silk": [{"text": "tamga v1", "x": 17, "y": 19}]}
+    r = design.sync(str(tmp_path), "led", spec, None)
+    assert r["parity"] == "OK" and r["pcb"]["board_items"] == ["4 x M2.5 holes", "1 silk texts"]
+    pcb = r["files"]["pcb"]
+    summary = server.board_summary(pcb)
+    assert summary["copper_layers"] == 4 and summary["counts"]["footprints"] == 3 + 4
+    text = Path(pcb).read_text()
+    assert text.count("(gr_arc") == 4 and '"In1.Cu" power)' in text  # iç katmanlar güç düzlemi
+    again = design.sync(str(tmp_path), "led", None, {"board": {"silk": [{"text": "tamga v2", "x": 17, "y": 19}]}})
+    assert "resized" not in again["pcb"]
+    text = Path(pcb).read_text()
+    assert text.count("(group") == 1 and "tamga v2" in text and "tamga v1" not in text
+    redrawn = design.sync(str(tmp_path), "led", None, {"board": {"corner_radius_mm": 1}})
+    assert redrawn["pcb"]["resized"].endswith("r1")

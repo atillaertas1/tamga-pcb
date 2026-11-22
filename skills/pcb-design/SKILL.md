@@ -32,6 +32,15 @@ are overwritten by the next `sync_design`, so change the spec instead.
 5. Later changes go through `sync_design(..., patch={parts:[...], remove:[...]})`; PCB placement is kept.
 6. Continue with the loop below from placement onwards.
 
+## Board shape and stackup (in the spec's `board`)
+- `corner_radius_mm` for rounded corners, or `outline_mm` for any polygon (mm from the top-left corner).
+- `mounting_holes: {diameter_mm: 3.2, inset_mm: 3.5}` puts M3 holes in the corners (2.2/2.7/3.2/4.3 = M2/M2.5/M3/M4);
+  `at_mm` for other positions. Keep parts clear of them.
+- `silk: [{text, x, y, size_mm?, layer?: 'B'}]` for a name, version or pinout text.
+- `layers: 4` makes In1/In2 power planes (the router does not use them): pour them with
+  `add_copper_zone(net='GND', layer='In1.Cu', stitch_pitch_mm=0)` and the main supply on `In2.Cu`, then the usual
+  `add_copper_zone()` on the outer layers. Use 4 layers for USB/RF/fast edges or when 2 layers will not route.
+
 ## Loop
 1. `board_summary` → understand nets and parts. Ask the user about missing information.
 2. Part choice: prefer **[B] basic** parts from `search_parts`; write the chosen LCSC code with
