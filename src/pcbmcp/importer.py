@@ -8,6 +8,7 @@ Bu yüzden KiCad'de aynı parçanın footprint'i varsa pad numarası+konum karş
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import shutil
@@ -33,8 +34,17 @@ def _paths() -> dict[str, Path]:
             "3d": root / "footprints" / f"{LIB}.3dshapes"}
 
 
+def _require_easyeda() -> None:
+    """easyeda2kicad opsiyonel ([lcsc] extra, AGPL). Kurulu değilse nasıl kurulacağını söyleyen
+    bir ToolError fırlat; kuruluysa hiçbir şey yapma."""
+    if importlib.util.find_spec("easyeda2kicad") is None:
+        raise ToolError("import_lcsc_part needs easyeda2kicad (optional, AGPL-3.0, installed separately): "
+                        "pip install 'pcbmcp[lcsc]'  or  uv sync --extra lcsc")
+
+
 def _convert(lcsc: str, out: Path) -> None:
     """easyeda2kicad -> out/x.kicad_sym, out/x.pretty, out/x.3dshapes (ağ). Testlerde monkeypatch edilir."""
+    _require_easyeda()
     proc = subprocess.run([sys.executable, "-m", "easyeda2kicad", "--full", f"--lcsc_id={lcsc}",
                            "--output", str(out / "x")], capture_output=True, text=True, timeout=120)
     if proc.returncode != 0 or not (out / "x.kicad_sym").is_file():

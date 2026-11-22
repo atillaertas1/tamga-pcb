@@ -78,3 +78,12 @@ def test_df40_u_numbering_is_detected():
     easyeda |= {str(51 + i): (-9.8 + 0.4 * i, -1.6) for i in range(50)}
     r = importer.compare_pads(easyeda, kicad)
     assert r["total"] == 100 and r["match"] < 10
+
+
+def test_missing_easyeda_says_how_to_install(monkeypatch):
+    """easyeda2kicad yoksa alt süreç hatası değil, kurulum talimatı."""
+    real = importer.importlib.util.find_spec
+    monkeypatch.setattr(importer.importlib.util, "find_spec",
+                        lambda name, *a: None if name == "easyeda2kicad" else real(name, *a))
+    with pytest.raises(importer.ToolError, match=r"pcbmcp\[lcsc\]"):
+        importer._require_easyeda()

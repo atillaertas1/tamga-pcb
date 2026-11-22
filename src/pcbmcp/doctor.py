@@ -112,7 +112,7 @@ def checks(fix: bool = False) -> list[tuple[str, str, str, str]]:
 
     # isteğe bağlı
     add(importlib.util.find_spec("easyeda2kicad") is not None, "easyeda2kicad", "importable",
-        "uv sync (import_lcsc_part only)", required=False)
+        "pip install 'pcbmcp[lcsc]' or uv sync --extra lcsc (import_lcsc_part only)", required=False)
     for name, url in (("jlcsearch", f"{parts.API}/components/list.json?search=ams1117&limit=1"),
                       ("easyeda", pinout.API.format(lcsc="C6186") + "?version=6.4.19.5")):
         try:
