@@ -19,7 +19,7 @@ report by [`scripts/session_report.py`](../scripts/session_report.py).
 Model `claude-sonnet-5-5` for both. "Tokens read" counts every call's full context again, so it adds up fast; about
 97 % of it was served from the prompt cache at a tenth of the price, which is why the whole board cost about fifty cents.
 
-The third row was measured after adding board shapes, 4/6 layers, impedance, differential pairs and  (tool schemas 13.3k → 16.1k characters): 31 API calls and $0.63 against 28 and $0.51. It called  7 times instead of 1 while settling the parts, which doubled the tool output; one run each, so this is within what a second run of the same setup could show, and still well under KiCAD-MCP-Server's 50 calls and $0.98. Raw numbers: [data/tamga-pcb-21-tools-sonnet.json](data/tamga-pcb-21-tools-sonnet.json).
+The third row was measured after adding board shapes, 4/6 layers, impedance, differential pairs and `create_part` (tool schemas 13.3k → 16.1k characters): 31 API calls and $0.63 against 28 and $0.51. It called `sync_design` 7 times instead of once while settling the parts, which doubled the tool output. With one run each it is not yet clear how much of that is the larger tool set and how much is run-to-run variation; it is still well under KiCAD-MCP-Server's 50 calls and $0.98. Raw numbers: [data/tamga-pcb-21-tools-sonnet.json](data/tamga-pcb-21-tools-sonnet.json).
 
 ### What the first attempt found
 
