@@ -64,7 +64,10 @@ Token, maliyet, süre ve ilk denemenin öğrettikleri: [docs/BENCHMARKS.md](docs
 gerekmez ve token harcamaz: hiçbiri Claude'a geri gitmez. Terminalden: `uv run tamga watch`, Claude hangi projede
 çalışıyorsa onu izler.
 
-<p align="center"><img src="assets/watch.png" alt="tamga watch: kart canlı yeniden çiziliyor, yanında araç adımları" width="90%" /></p>
+<p align="center"><img src="assets/tinyled-live.gif" alt="tamga watch gerçek bir oturumu tekrar oynatıyor: ATtiny85 kartı yerleşiyor, rotalanıyor, dökülüyor, DRC temizlenene kadar düzeltiliyor" width="90%" /></p>
+<p align="center"><sub>Gerçek, kimsenin karışmadığı bir oturumun tekrarı: tek prompt (USB-C, LDO, ISP header ve üç LED'li, yuvarlak
+köşeli, montaj delikli bir ATtiny85 kartı), 59 araç çağrısı, 5,5 dakika, Sonnet 5.5 ile 0,68 $. Her kare oturumun kendi
+kart hallerinden biri; <a href="scripts/replay_gif.py"><code>scripts/replay_gif.py</code></a> ile üretildi.</sub></p>
 
 ## Kurulum
 

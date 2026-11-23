@@ -64,7 +64,10 @@ schematic after every step, with each tool call, how long it took and what it fo
 It runs locally, needs no KiCad window, and costs no tokens: none of it goes back to Claude. From a terminal:
 `uv run tamga watch` follows whatever project Claude is working on.
 
-<p align="center"><img src="assets/watch.png" alt="tamga watch: the board redrawn live next to the list of tool steps" width="90%" /></p>
+<p align="center"><img src="assets/tinyled-live.gif" alt="tamga watch replaying a real session: an ATtiny85 board placed, routed, poured and fixed until DRC is clean" width="90%" /></p>
+<p align="center"><sub>Replay of a real, unattended session: one prompt (an ATtiny85 board with USB-C, LDO, ISP header and
+three LEDs, rounded corners, mounting holes), 59 tool calls, 5½ minutes, $0.68 with Sonnet 5.5. Every frame is one of
+the session's own board states, made with <a href="scripts/replay_gif.py"><code>scripts/replay_gif.py</code></a>.</sub></p>
 
 ## Install
 

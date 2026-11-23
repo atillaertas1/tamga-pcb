@@ -278,8 +278,11 @@ function steps(){const ul=$("steps");for(const s of state.steps){if(s.t<=lastSte
   const u=s.result&&(s.result.unrouted_after??s.result.unrouted);if(u!==undefined){$("unr").textContent="unrouted "+u;$("unr").className="pill "+(u=="0"?"ok":"")}}}
 async function load(){state=await (await fetch("/state")).json();
  if(state.project)$("proj").textContent=state.project+(state.pcb?" / "+state.pcb:"");steps();render()}
-const es=new EventSource("/events");es.onmessage=()=>{load();$("ago").textContent="updated "+new Date().toLocaleTimeString()};
-es.onopen=()=>{$("dot").className="dot on";$("ago").textContent="live"};es.onerror=()=>{$("dot").className="dot";$("ago").textContent="reconnecting"};
+// ?static=1: canlı bağlantı yok (ekran görüntüsü / replay için tarayıcı yüklemenin bitmesini bekleyebilsin)
+if(!location.search.includes("static")){const es=new EventSource("/events");
+ es.onmessage=()=>{load();$("ago").textContent="updated "+new Date().toLocaleTimeString()};
+ es.onopen=()=>{$("dot").className="dot on";$("ago").textContent="live"};es.onerror=()=>{$("dot").className="dot";$("ago").textContent="reconnecting"}}
+else{$("dot").className="dot on";$("ago").textContent="replay"}
 load();
 </script></body></html>
 """
