@@ -5,7 +5,7 @@
 First public release.
 
 - **Claude Code plugin** with its own marketplace: `/plugin install tamga-pcb --marketplace atillaertas1/tamga-pcb`.
-  Brings the MCP server (20 tools) and the `pcb-design` skill.
+  Brings the MCP server (21 tools) and the `pcb-design` skill.
 - **Spec → schematic → PCB** with `sync_design`: functional sheets, power symbols, sheet notes, circuit blocks with
   one sheet per instance, netlist and pin/pad checks, LCSC pinout check, ERC and schematic↔PCB parity.
 - **Board tools:** placement, netclasses, guided locked routes (`route_net`), headless Freerouting, ground pours with
@@ -21,3 +21,10 @@ First public release.
 - **Readable schematics:** small parts are wired to the pin they belong to; series chains are columns.
 - **Reroute safely:** `autoroute` rips up unlocked tracks first; `add_copper_zone` replaces an old pour.
 - **Better part search:** values go to value lookups (`5.1k`, `100nF`), basic parts with unknown stock are kept.
+- **Board shape and stackup:** rounded corners or any outline, 4/6 layers with inner power planes, mounting holes and
+  silkscreen text, all from the spec.
+- **Critical routing:** netclass widths from a target impedance (IPC-2141, JLC stackups), differential pairs with
+  `route_net`, routed lengths and skew in `board_summary`.
+- **New parts:** `create_part` makes footprints (SOIC/TSSOP/MSOP, QFN/DFN, headers, custom pads) that match KiCad's own
+  pad positions, and symbols, when neither KiCad nor LCSC has the part.
+- **More exports:** schematic PDF, STEP, ODB++, IPC-2581 and a JLC parts-cost summary from `export_fab`.

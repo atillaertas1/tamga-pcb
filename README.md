@@ -28,7 +28,7 @@
 placement, routing, ground pour, DRC and fab files all made through tamga-pcb's tools.
 <a href="examples/esp32c3-devboard">Rebuild it yourself</a>.</sub></p>
 
-**tamga-pcb** gives Claude Code the whole KiCad workflow as 20 compact tools. You describe the board in plain
+**tamga-pcb** gives Claude Code the whole KiCad workflow as 21 compact tools. You describe the board in plain
 words; Claude writes a short circuit spec, tamga-pcb turns it into a schematic and a PCB, places the parts,
 routes the board with Freerouting, pours ground, loops on DRC until it is clean, and exports Gerbers, BOM and
 pick-and-place for JLCPCB. Every LCSC part is checked against its real pinout on the way, and Claude never reads
@@ -149,22 +149,23 @@ Claude follows the same steps every time.
 | --- | --- |
 | `sync_design` | Spec → schematic + PCB, netlist and pinout checks, ERC, parity. Edits go through small patches. |
 | `find_symbol`, `get_symbol`, `find_footprint` | Search KiCad's libraries; confirm pin names and that footprint pads match. |
-| `search_parts`, `import_lcsc_part` | JLCPCB/LCSC stock and price, basic parts first; bring in parts KiCad doesn't have. |
-| `board_summary`, `get_footprint` | One line per footprint and net, pad positions. No raw `.kicad_pcb` in the context. |
+| `search_parts`, `import_lcsc_part` | JLCPCB/LCSC stock and price, basic parts first, passives by value; bring in parts KiCad doesn't have. |
+| `create_part` | Footprint and symbol from a datasheet when neither KiCad nor LCSC has the part: SOIC/TSSOP/MSOP, QFN/DFN, headers, custom pads. |
+| `board_summary`, `get_footprint` | One line per footprint and net, pad positions, routed lengths and pair skew. No raw `.kicad_pcb` in the context. |
 | `place_footprints` | Move, rotate and flip many footprints in one call. |
-| `set_netclass`, `route_net` | Track widths per net class; guided, locked routes for critical nets. |
+| `set_netclass`, `route_net` | Track widths per net class, sized from a target impedance; guided, locked routes and differential pairs. |
 | `autoroute` | Freerouting without its GUI, with progress and a timeout that reports where it stopped. |
 | `add_copper_zone`, `fill_zones` | Ground pours with stitching vias. |
 | `run_drc`, `run_erc` | Violations grouped by type with example locations: 300 violations fit in about 1 KB. |
 | `render_board` | PNG of the board for a visual check. |
-| `export_fab` | Gerbers, drill, BOM and CPL for JLCPCB. |
+| `export_fab` | Gerbers, drill, BOM and CPL for JLCPCB; optional schematic PDF, STEP, ODB++, IPC-2581 and a parts-cost summary. |
 | `import_board` | Bring in Altium, Eagle, PADS or CADSTAR boards. |
 
 ## Why it is cheap on tokens
 
 | Choice | Effect |
 | --- | --- |
-| 20 tools with short descriptions | all tool schemas together ≈ 3.3k tokens (13.3k characters, measured) |
+| 21 tools with short descriptions | all tool schemas together ≈ 4.0k tokens (16.1k characters, measured) |
 | Small answers | in the [CH340 run](examples/ch340-usb-uart/SESSION.md) all 48 tool results together were ≈ 4.2k tokens, about 350 characters per call |
 | No raw KiCad files, one line per footprint | a 7-part board summary is about 900 characters |
 | DRC/ERC grouped by type, three example locations | 300 violations → about 1 KB |

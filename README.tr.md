@@ -28,7 +28,7 @@
 rota, GND dökümü, DRC ve üretim dosyaları tamamen tamga-pcb araçlarıyla yapıldı.
 <a href="examples/esp32c3-devboard">Kendin yeniden üret</a>.</sub></p>
 
-**tamga-pcb**, KiCad iş akışının tamamını Claude Code'a 20 sade araç olarak verir. Kartı düz cümlelerle
+**tamga-pcb**, KiCad iş akışının tamamını Claude Code'a 21 sade araç olarak verir. Kartı düz cümlelerle
 anlatırsın; Claude kısa bir devre tanımı yazar, tamga-pcb bundan şematik ve PCB üretir, parçaları yerleştirir,
 Freerouting ile rotalar, GND döker, DRC temiz çıkana kadar döner ve JLCPCB için Gerber, BOM ve dizgi dosyasını
 çıkarır. Yol boyunca her LCSC parçası gerçek pin dizilimiyle karşılaştırılır; Claude ham KiCad dosyası okumaz,
@@ -148,15 +148,16 @@ Claude her seferinde aynı adımları izler.
 | --- | --- |
 | `sync_design` | Tanım → şematik + PCB, netlist ve pinout kontrolü, ERC, uyum. Düzenlemeler küçük yamalarla. |
 | `find_symbol`, `get_symbol`, `find_footprint` | KiCad kütüphanelerinde arar; pin adlarını ve pad eşleşmesini doğrular. |
-| `search_parts`, `import_lcsc_part` | JLCPCB/LCSC stok ve fiyat, önce basic parçalar; KiCad'de olmayan parçayı getirir. |
-| `board_summary`, `get_footprint` | Footprint ve net başına tek satır, pad konumları. Bağlama ham `.kicad_pcb` girmez. |
+| `search_parts`, `import_lcsc_part` | JLCPCB/LCSC stok ve fiyat, önce basic parçalar, pasifler değere göre; KiCad'de olmayan parçayı getirir. |
+| `create_part` | Ne KiCad'de ne LCSC'de olan parça için datasheet'ten footprint ve sembol: SOIC/TSSOP/MSOP, QFN/DFN, header, özel pad'ler. |
+| `board_summary`, `get_footprint` | Footprint ve net başına tek satır, pad konumları, rota uzunlukları ve çift farkı (skew). Bağlama ham `.kicad_pcb` girmez. |
 | `place_footprints` | Birçok footprint'i tek çağrıda taşır, döndürür, çevirir. |
-| `set_netclass`, `route_net` | Net sınıfına göre iz genişliği; kritik netler için yönlendirilmiş, kilitli rota. |
+| `set_netclass`, `route_net` | Net sınıfına göre iz genişliği, hedef empedanstan hesaplanır; kilitli kritik rotalar ve diferansiyel çiftler. |
 | `autoroute` | GUI'siz Freerouting; ilerleme bildirir, zaman aşımında nerede kaldığını söyler. |
 | `add_copper_zone`, `fill_zones` | Stitching via'lı GND dökümü. |
 | `run_drc`, `run_erc` | İhlaller türe göre gruplu, örnek konumlu: 300 ihlal ~1 KB. |
 | `render_board` | Görsel kontrol için kartın PNG'si. |
-| `export_fab` | JLCPCB için Gerber, delik, BOM ve CPL. |
+| `export_fab` | JLCPCB için Gerber, delik, BOM ve CPL; istenirse şematik PDF, STEP, ODB++, IPC-2581 ve parça maliyet özeti. |
 | `import_board` | Altium, Eagle, PADS ya da CADSTAR kartlarını içe aktarır. |
 
 ## Geliştirme
