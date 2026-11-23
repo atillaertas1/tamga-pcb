@@ -19,7 +19,7 @@ from pathlib import Path
 import anyio.from_thread
 from mcp.server.mcpserver import Context, MCPServer
 
-from . import design, impedance, importer, library, pinout, report, route
+from . import design, impedance, importer, library, partgen, pinout, report, route
 from . import parts as parts_mod
 from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
@@ -88,6 +88,19 @@ def import_lcsc_part(lcsc: str, compare_footprint: str = "") -> dict:
     (or compare_footprint given), whether pad numbering matches. On kicad_footprint_mismatch
     do NOT mix: use the KiCad footprint with a KiCad-numbered symbol. Verify vs datasheet."""
     return importer.import_part(lcsc, compare_footprint)
+
+
+@tool
+def create_part(name: str, pins: list[dict] | None = None, package: dict | None = None,
+                reference: str = "U", footprint: str = "", description: str = "") -> dict:
+    """Make a symbol and/or footprint that neither KiCad nor LCSC has, in the tamga_user library.
+    pins: [{number, name, type?: input|output|bidirectional|passive|power_in|power_out, side?}].
+    package: {type: soic|qfn|dfn|header|pads, pins, pitch_mm, body_w_mm?, body_l_mm?, lead_span_mm?
+      (soic tip-to-tip), lead_len_mm?, ep_mm? (qfn/dfn thermal pad, number pins+1), rows? (header),
+      pads? ([{number,x,y,w,h,drill?}] for 'pads')}. Pads follow datasheet numbering (soic: 1 top-left,
+    down then up the right side; qfn: counter-clockwise from top-left). footprint links the symbol to an
+    existing footprint instead. Check the datasheet's land pattern before ordering."""
+    return partgen.create(name, pins, package, reference, footprint, description)
 
 
 @tool

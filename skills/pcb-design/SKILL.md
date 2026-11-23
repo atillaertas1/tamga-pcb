@@ -26,6 +26,10 @@ are overwritten by the next `sync_design`, so change the spec instead.
    variant, the wrong part or LED polarity; do not move on without checking the datasheet.
    If KiCad has no suitable symbol/footprint, use `import_lcsc_part(lcsc)`. If it returns
    `kicad_footprint_mismatch`, **do not mix** the EasyEDA footprint with the KiCad symbol (pad numbering differs).
+   If neither KiCad nor LCSC has it, `create_part(name, pins, package)` makes both from the datasheet:
+   package soic (SOP/SSOP/TSSOP/MSOP: lead_span_mm = tip to tip), qfn/dfn (ep_mm for the thermal pad),
+   header, or pads for anything else. Copy dimensions from the datasheet's package drawing; tell the user
+   to compare the result with the recommended land pattern before ordering.
 4. `sync_design(project_dir, name, spec)` → expect `netlist_check: OK`, `erc: CLEAN`, `parity: OK`.
    - `pin_not_connected` → connect it or add it to `nc` (a deliberate decision, never `*` for everything).
    - `pwr_flags_added` is normal.
