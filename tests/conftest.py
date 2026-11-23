@@ -11,3 +11,4 @@ def _no_easyeda(monkeypatch, tmp_path_factory):
         raise ToolError("easyeda offline in tests")
     monkeypatch.setattr(pinout, "_fetch", offline)
     monkeypatch.setattr(pinout, "CACHE", tmp_path_factory.mktemp("cache"))
+    monkeypatch.setenv("TAMGA_STEP_LOG", "0")  # testler kullanıcının canlı izleme günlüğüne yazmasın

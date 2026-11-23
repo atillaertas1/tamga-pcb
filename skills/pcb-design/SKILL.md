@@ -6,6 +6,7 @@ description: Use when designing, placing, routing, reviewing or exporting a KiCa
 # PCB design loop (tamga-pcb)
 
 ## Rules
+- If the user wants to watch the work, call `live_view()` once and give them the URL; it keeps running.
 - **Never** Read `.kicad_pcb` / `.kicad_sch` files; use `board_summary`, `get_footprint`.
 - Project files (`.kicad_pro`) carry the design rules; when copying a board, copy the whole folder.
 - Write tools keep backups (`.tamga_backups/`). Still suggest a git commit before big steps.

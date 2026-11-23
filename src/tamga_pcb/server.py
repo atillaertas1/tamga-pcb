@@ -12,14 +12,16 @@ import csv
 import functools
 import inspect
 import json
+import os
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
 import anyio.from_thread
 from mcp.server.mcpserver import Context, MCPServer
 
-from . import design, impedance, importer, library, partgen, pinout, report, route
+from . import design, impedance, importer, library, partgen, paths, pinout, report, route
 from . import parts as parts_mod
 from .kicad import KicadError, abspath, cli, drc_json, erc_json, run_worker
 
@@ -33,21 +35,92 @@ Never read .kicad_pcb files directly; use these tools. Write tools keep backups.
 mcp = MCPServer("tamga-pcb", instructions=INSTRUCTIONS, version="0.1.0")
 
 
+_last_project: list[Path] = []  # klasör vermeyen araçların (search_parts...) günlüğü buraya
+LIVE_LOG = paths.DATA_DIR / "live" / "steps.jsonl"  # tamga watch bunu izler
+
+
+def _short(v, n: int = 60):
+    if isinstance(v, (list, tuple)):
+        return f"[{len(v)}]"
+    if isinstance(v, dict):
+        return f"{{{len(v)}}}"
+    if isinstance(v, str) and ("/" in v or "\\" in v) and Path(v).suffix:
+        return Path(v).name
+    s = str(v)
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def log_step(name: str, bound: dict, result, error: str | None, ms: int) -> None:
+    """Canlı izleme (tamga watch) için <proje>/.tamga/steps.jsonl'e tek satır. Hata asla araca yansımaz."""
+    if os.environ.get("TAMGA_STEP_LOG") == "0":
+        return
+    try:
+        where = next((bound[k] for k in ("pcb_path", "project_dir", "sch_path", "input_path") if bound.get(k)), None)
+        if where:
+            d = Path(abspath(where))
+            d = d if d.is_dir() or not d.suffix else d.parent
+            _last_project[:] = [d]
+        d = _last_project[0] if _last_project else None
+        summary = {}
+        if isinstance(result, dict):
+            for k, v in result.items():
+                if k in ("backup", "note", "legend", "pcb", "out", "files", "dir", "steps"):
+                    continue
+                summary[k] = _short(v)
+                if len(summary) >= 6:
+                    break
+        args = {k: _short(v) for k, v in bound.items() if k not in ("ctx",) and v not in (None, "", [], {})}
+        row = {"t": time.time(), "tool": name, "args": args, "ms": ms, "project": str(d) if d else None,
+               **({"error": error[:300]} if error else {"result": summary})}
+        line = json.dumps(row, ensure_ascii=False) + "\n"
+        # genel canlı günlük: proje klasörü henüz yokken (ilk parça aramaları) de görünsün
+        live = LIVE_LOG
+        live.parent.mkdir(parents=True, exist_ok=True)
+        if live.is_file() and live.stat().st_size > 5_000_000:
+            live.replace(live.with_suffix(".1.jsonl"))
+        with open(live, "a", encoding="utf-8") as f:
+            f.write(line)
+        if d:
+            (d / ".tamga").mkdir(exist_ok=True)
+            with open(d / ".tamga" / "steps.jsonl", "a", encoding="utf-8") as f:
+                f.write(line)
+    except Exception:  # günlük yan iş: araç sonucunu asla bozmasın
+        pass
+
+
 def tool(fn):
     """MCP aracı olarak kaydet, ama sonucu tek satır kompakt JSON metin olarak gönder.
 
     mcp 2.x dict'leri indent=2 ile serileştiriyor (~%30 boşa token). Orijinal fonksiyon
-    dict döndürmeye devam eder (testler ve Python'dan kullanım için).
+    dict döndürmeye devam eder (testler ve Python'dan kullanım için). Her çağrı canlı izleme
+    günlüğüne de yazılır (log_step).
     """
+    sig = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def logged(*args, **kwargs) -> dict:  # Python'dan çağıranlar da (build.py) günlüğe düşsün
+        t0 = time.monotonic()
+        try:
+            bound = dict(sig.bind_partial(*args, **kwargs).arguments)
+        except TypeError:
+            bound = dict(kwargs)
+        try:
+            res = fn(*args, **kwargs)
+        except Exception as e:
+            log_step(fn.__name__, bound, None, str(e), int((time.monotonic() - t0) * 1000))
+            raise
+        log_step(fn.__name__, bound, res, None, int((time.monotonic() - t0) * 1000))
+        return res
+
     @functools.wraps(fn)
     def wrapper(*args, **kwargs) -> str:
-        return json.dumps(fn(*args, **kwargs), ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(logged(*args, **kwargs), ensure_ascii=False, separators=(",", ":"))
 
     del wrapper.__wrapped__  # şema dönüş tipini fn'den (dict) değil wrapper'dan (str) alsın
     wrapper.__signature__ = inspect.signature(fn).replace(return_annotation=str)
     wrapper.__annotations__ = {**fn.__annotations__, "return": "str"}
     mcp.tool(structured_output=False)(wrapper)
-    return fn
+    return logged
 
 
 # ------------------------------------------------------------------ tasarım (şematik + PCB)
@@ -88,6 +161,18 @@ def import_lcsc_part(lcsc: str, compare_footprint: str = "") -> dict:
     (or compare_footprint given), whether pad numbering matches. On kicad_footprint_mismatch
     do NOT mix: use the KiCad footprint with a KiCad-numbered symbol. Verify vs datasheet."""
     return importer.import_part(lcsc, compare_footprint)
+
+
+@tool
+def live_view(project_dir: str = "", port: int = 8765, open_browser: bool = True) -> dict:
+    """Open a browser page that shows the board, schematic and every tool step live while you work
+    (only for the user; costs no tokens). Call when the user wants to watch; it keeps running."""
+    from . import watch
+    url, new = watch.start(Path(abspath(project_dir)) if project_dir else None, port)
+    if new and open_browser:
+        import webbrowser
+        webbrowser.open(url)
+    return {"url": url, "started": new, "following": project_dir or "the latest project"}
 
 
 @tool
@@ -391,6 +476,9 @@ def main() -> None:
     if sys.argv[1:2] == ["doctor"]:
         from . import doctor
         sys.exit(doctor.main(sys.argv[2:]))
+    if sys.argv[1:2] == ["watch"]:
+        from . import watch
+        sys.exit(watch.main(sys.argv[2:]))
     mcp.run()
 
 

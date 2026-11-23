@@ -28,7 +28,7 @@
 placement, routing, ground pour, DRC and fab files all made through tamga-pcb's tools.
 <a href="examples/esp32c3-devboard">Rebuild it yourself</a>.</sub></p>
 
-**tamga-pcb** gives Claude Code the whole KiCad workflow as 21 compact tools. You describe the board in plain
+**tamga-pcb** gives Claude Code the whole KiCad workflow as 22 compact tools. You describe the board in plain
 words; Claude writes a short circuit spec, tamga-pcb turns it into a schematic and a PCB, places the parts,
 routes the board with Freerouting, pours ground, loops on DRC until it is clean, and exports Gerbers, BOM and
 pick-and-place for JLCPCB. Every LCSC part is checked against its real pinout on the way, and Claude never reads
@@ -56,6 +56,15 @@ raw KiCad files: tools answer in one-line summaries, so a whole board fits comfo
 </table>
 
 Token counts, cost, time and what the first attempt taught us: [docs/BENCHMARKS.md](docs/BENCHMARKS.md). On the same prompt with the same model, the most-starred KiCad MCP server also finished the board; tamga-pcb used 48 % less money, 43 % fewer tool calls and 40 % less peak context (one run each, [details](docs/BENCHMARKS.md#against-another-kicad-mcp-server)).
+
+## Watch it live
+
+Say *"I want to watch"* and Claude calls `live_view`: a page opens in your browser and redraws the board and the
+schematic after every step, with each tool call, how long it took and what it found, and the DRC status on top.
+It runs locally, needs no KiCad window, and costs no tokens: none of it goes back to Claude. From a terminal:
+`uv run tamga watch` follows whatever project Claude is working on.
+
+<p align="center"><img src="assets/watch.png" alt="tamga watch: the board redrawn live next to the list of tool steps" width="90%" /></p>
 
 ## Install
 
@@ -158,6 +167,7 @@ Claude follows the same steps every time.
 | `add_copper_zone`, `fill_zones` | Ground pours with stitching vias. |
 | `run_drc`, `run_erc` | Violations grouped by type with example locations: 300 violations fit in about 1 KB. |
 | `render_board` | PNG of the board for a visual check. |
+| `live_view` | Opens the live page for the user (above); nothing comes back to Claude. |
 | `export_fab` | Gerbers, drill, BOM and CPL for JLCPCB; optional schematic PDF, STEP, ODB++, IPC-2581 and a parts-cost summary. |
 | `import_board` | Bring in Altium, Eagle, PADS or CADSTAR boards. |
 
@@ -165,7 +175,7 @@ Claude follows the same steps every time.
 
 | Choice | Effect |
 | --- | --- |
-| 21 tools with short descriptions | all tool schemas together ≈ 4.0k tokens (16.1k characters, measured) |
+| 22 tools with short descriptions | all tool schemas together ≈ 4.2k tokens (16.7k characters, measured) |
 | Small answers | in the [CH340 run](examples/ch340-usb-uart/SESSION.md) all 48 tool results together were ≈ 4.2k tokens, about 350 characters per call |
 | No raw KiCad files, one line per footprint | a 7-part board summary is about 900 characters |
 | DRC/ERC grouped by type, three example locations | 300 violations → about 1 KB |

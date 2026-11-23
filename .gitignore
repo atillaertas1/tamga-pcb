@@ -13,3 +13,4 @@ fp-info-cache
 projects/
 !assets/**/*.png
 !.claude-plugin/icon.png
+.tamga/

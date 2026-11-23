@@ -38,3 +38,26 @@ def test_type_cap():
     rep = {"violations": [_v(f"t{i}", "warning", "x") for i in range(20)]}
     s = summarize(rep, max_types=5)
     assert len(s["types"]) == 5 and s["more_types"] == 15
+
+
+def test_tool_calls_are_logged_for_tamga_watch(tmp_path, monkeypatch):
+    """Her araç çağrısı <proje>/.tamga/steps.jsonl'e tek satır; klasörsüz araç son projeye yazar."""
+    import json
+    from tamga_pcb import server
+    monkeypatch.delenv("TAMGA_STEP_LOG", raising=False)
+    monkeypatch.setattr(server, "LIVE_LOG", tmp_path / "live" / "steps.jsonl")
+    monkeypatch.setattr(server, "_last_project", [])
+    pcb = tmp_path / "b.kicad_pcb"
+    pcb.write_text("")
+    monkeypatch.setattr(server, "run_worker", lambda cmd, a: {"unrouted": 3, "backup": "/x", "footprints": ["a", "b"]})
+    server.board_summary(str(pcb))
+    monkeypatch.setattr(server.parts_mod, "search", lambda *a, **k: {"parts": ["C1"], "shown": 1})
+    server.search_parts("resistor 10k")
+    rows = [json.loads(line) for line in (tmp_path / ".tamga" / "steps.jsonl").read_text().splitlines()]
+    assert [r["tool"] for r in rows] == ["board_summary", "search_parts"]
+    assert rows[0]["result"] == {"unrouted": "3", "footprints": "[2]"} and rows[0]["args"]["pcb_path"] == "b.kicad_pcb"
+    live = [json.loads(line)["tool"] for line in (tmp_path / "live" / "steps.jsonl").read_text().splitlines()]
+    assert live == ["board_summary", "search_parts"] and rows[1]["project"] == str(tmp_path)
+    monkeypatch.setenv("TAMGA_STEP_LOG", "0")
+    server.search_parts("x")
+    assert len((tmp_path / ".tamga" / "steps.jsonl").read_text().splitlines()) == 2

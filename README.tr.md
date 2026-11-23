@@ -28,7 +28,7 @@
 rota, GND dökümü, DRC ve üretim dosyaları tamamen tamga-pcb araçlarıyla yapıldı.
 <a href="examples/esp32c3-devboard">Kendin yeniden üret</a>.</sub></p>
 
-**tamga-pcb**, KiCad iş akışının tamamını Claude Code'a 21 sade araç olarak verir. Kartı düz cümlelerle
+**tamga-pcb**, KiCad iş akışının tamamını Claude Code'a 22 sade araç olarak verir. Kartı düz cümlelerle
 anlatırsın; Claude kısa bir devre tanımı yazar, tamga-pcb bundan şematik ve PCB üretir, parçaları yerleştirir,
 Freerouting ile rotalar, GND döker, DRC temiz çıkana kadar döner ve JLCPCB için Gerber, BOM ve dizgi dosyasını
 çıkarır. Yol boyunca her LCSC parçası gerçek pin dizilimiyle karşılaştırılır; Claude ham KiCad dosyası okumaz,
@@ -56,6 +56,15 @@ araçlar tek satırlık özetlerle cevap verir.
 </table>
 
 Token, maliyet, süre ve ilk denemenin öğrettikleri: [docs/BENCHMARKS.md](docs/BENCHMARKS.md). Aynı prompt ve aynı modelle en çok yıldızlı KiCad MCP sunucusu da kartı bitirdi; tamga-pcb %48 daha az maliyet, %43 daha az araç çağrısı ve %40 daha küçük en yüksek bağlamla yaptı (her biri tek koşu, [ayrıntılar](docs/BENCHMARKS.md#against-another-kicad-mcp-server)).
+
+## Canlı izle
+
+*"İzlemek istiyorum"* dediğinde Claude `live_view`'ı çağırır: tarayıcında bir sayfa açılır, her adımdan sonra kartı ve
+şematiği yeniden çizer; yanında her araç çağrısı, süresi ve sonucu, üstte DRC durumu. Yerelde çalışır, KiCad penceresi
+gerekmez ve token harcamaz: hiçbiri Claude'a geri gitmez. Terminalden: `uv run tamga watch`, Claude hangi projede
+çalışıyorsa onu izler.
+
+<p align="center"><img src="assets/watch.png" alt="tamga watch: kart canlı yeniden çiziliyor, yanında araç adımları" width="90%" /></p>
 
 ## Kurulum
 
@@ -157,6 +166,7 @@ Claude her seferinde aynı adımları izler.
 | `add_copper_zone`, `fill_zones` | Stitching via'lı GND dökümü. |
 | `run_drc`, `run_erc` | İhlaller türe göre gruplu, örnek konumlu: 300 ihlal ~1 KB. |
 | `render_board` | Görsel kontrol için kartın PNG'si. |
+| `live_view` | Kullanıcı için canlı izleme sayfasını açar (yukarıda); Claude'a hiçbir şey dönmez. |
 | `export_fab` | JLCPCB için Gerber, delik, BOM ve CPL; istenirse şematik PDF, STEP, ODB++, IPC-2581 ve parça maliyet özeti. |
 | `import_board` | Altium, Eagle, PADS ya da CADSTAR kartlarını içe aktarır. |
 
