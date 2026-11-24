@@ -46,5 +46,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends kicad kicad-symbols kicad-footprints
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --extra lcsc
+      # doctor creates KiCad's global lib tables before the tests, so parallel workers don't race on them
       - run: uv run tamga doctor --fix
-      - run: uv run pytest -q -rs
+      # KiCad tests are many 2-10 s subprocess runs; one worker per CPU (pytest-xdist)
+      - run: uv run pytest -q -rs -n auto
