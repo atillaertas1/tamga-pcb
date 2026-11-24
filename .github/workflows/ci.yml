@@ -1,8 +1,17 @@
 name: CI
 
 on:
+  # Branch'lerde PR çalışması yeter; push yalnızca main'de (aksi halde her PR iki kez koşar)
   push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "assets/**", ".github/ISSUE_TEMPLATE/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**", "assets/**", ".github/ISSUE_TEMPLATE/**"]
+
+# Aynı PR'a yeni commit gelince eskisini iptal et; main'deki çalışmalar tamamlansın
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   unit:
