@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # GitHub Actions only (checkout, setup-uv, setup-java). Python deps are pinned in uv.lock
+  # and updated by hand, since KiCad compatibility has to be checked with the full suite.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "CI"
