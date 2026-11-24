@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg" />
-    <img src="assets/logo-light.svg" alt="tamga" width="320" />
+    <img src="assets/logo-light.svg" alt="tamga pcb" width="460" />
   </picture>
 </p>
 
