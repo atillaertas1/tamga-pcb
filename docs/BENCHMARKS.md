@@ -67,13 +67,14 @@ re-checked with KiCad's DRC afterwards.
 | LCSC numbers | looked up in JLC's catalogue | from memory (local parts DB not downloaded) |  |
 
 ```mermaid
-xychart-beta
-    title "tamga-pcb (left bar) vs KiCAD-MCP-Server (right bar), lower is better"
-    x-axis ["API calls", "Tool calls", "Peak context (k tokens)", "Tool results (k chars)", "Cost (US cents)"]
-    y-axis 0 --> 117
-    bar [28, 48, 64, 17, 51]
-    bar [50, 84, 107, 72, 98]
+xychart-beta horizontal
+    title "tamga-pcb as % of KiCAD-MCP-Server (100 %), lower is better"
+    x-axis ["API calls", "Tool calls", "Tokens read", "Peak context", "Tool results", "Cost", "Wall time"]
+    y-axis "% of KiCAD-MCP-Server" 0 --> 100
+    bar [56, 57, 40, 60, 23, 52, 65]
 ```
+
+Each bar is tamga-pcb's number divided by KiCAD-MCP-Server's, from the table above.
 
 **What this does and doesn't show**
 - Both tools got the job done; KiCAD-MCP-Server covers far more of KiCad (229 tools: hierarchical sheets, symbol
