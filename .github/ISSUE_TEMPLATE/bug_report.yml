@@ -1,0 +1,70 @@
+name: Bug report
+description: Something in tamga-pcb broke or produced a wrong board.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Questions and "how do I…?" belong in
+        [Discussions](https://github.com/atillaertas1/tamga-pcb/discussions).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, including the exact error text if there was one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The prompt you gave Claude, or the tool call and circuit spec. A minimal example helps most.
+      placeholder: |
+        1. Prompt: "Make me an ESP32-C3 board…"
+        2. Claude called `autoroute`
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `tamga doctor`
+      description: Run `tamga doctor` in a terminal and paste the whole output. It checks KiCad, libraries, Freerouting, Java and network access.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: tamga-pcb version
+      description: A release (e.g. 0.1.0) or a commit hash if you run from source.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, the board file, DRC report, logs.
