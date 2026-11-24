@@ -184,7 +184,8 @@ claude --plugin-dir .        # çalışma kopyasını plugin olarak yükle
 ```
 
 Örnek kart `uv run python examples/esp32c3-devboard/build.py` ile baştan sona yeniden üretilir. Değişiklikler
-[changelog](CHANGELOG.md)'da.
+[changelog](CHANGELOG.md)'da. Katkı vermek ister misin? [CONTRIBUTING.md](CONTRIBUTING.md) ve
+[good first issue](https://github.com/atillaertas1/tamga-pcb/labels/good%20first%20issue) etiketli işlere bak.
 
 ## Ad
 

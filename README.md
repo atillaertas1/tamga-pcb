@@ -202,7 +202,8 @@ claude --plugin-dir .     # run Claude Code with your working copy as the plugin
 ```
 
 The example board is rebuilt end to end by `uv run python examples/esp32c3-devboard/build.py`. Changes are listed in
-the [changelog](CHANGELOG.md).
+the [changelog](CHANGELOG.md). Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[good first issues](https://github.com/atillaertas1/tamga-pcb/labels/good%20first%20issue).
 
 ## Roadmap
 
